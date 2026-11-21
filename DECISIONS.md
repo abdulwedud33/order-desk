@@ -189,6 +189,25 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** The tracking route is prerendered to static HTML and lightweight chunks with no third-party libraries, tracking pixels, or analytics. Automated bundle analysis in CI verifies gzipped JS is strictly under the 25 KB budget with `noindex` and `no-referrer` tags.
    - **Reason:** Guarantees sub-3-second load times on slow mobile 3G networks in Ethiopia (`docs/02-technical-requirements.md` section 6).
 
+## Milestone M9 Decisions (2026-11-21)
+
+1. **DEC-042: Owner-Only Access Restriction on Reporting RPCs and Export**
+   - **Decision:** In accordance with `docs/03-app-flow.md` section 4 line 127 (`Reports and export: Owner Yes, Staff No, Kitchen No, Courier No`), all report RPCs (`dashboard_summary`, `top_items`, `orders_by_hour`, `late_orders`, `repair_turnaround`, `orders_for_export`) enforce `public.has_role(p_shop, 'owner')` in PostgreSQL. Any non-owner role calling these RPCs receives coded error `FORBIDDEN` (42501). The UI additionally renders an owner-only access guard.
+   - **Reason:** Enforces zero unauthorized data access (Non-negotiable Rule 2). Sensitive shop revenue, cash collected, and aggregate business figures are strictly limited to shop owners.
+
+2. **DEC-043: Immutable Ledger Reconciliation Invariant for Reports**
+   - **Decision:** Report numbers are computed directly and strictly from immutable ledgers and core order tables. `cash_in` is computed exclusively as `sum(payments + deposits - refunds)` from the append-only `order_payments` ledger. `sales_total` is computed from completed `order_money.total`. Unpaid balance is computed from active/completed `order_money` rows.
+   - **Reason:** Fulfills Milestone M9 exit criterion: "report numbers reconcile with ledgers". Prevents discrepancy between reports and accounting audits.
+
+3. **DEC-044: Formula-Safe CSV Export (Spreadsheet Injection Mitigation)**
+   - **Decision:** All cells exported via `toCsv` / `formatOrdersToCsv` are checked for formula-initiating characters (`=`, `+`, `-`, `@`, `\t`, `\r`). If detected, they are automatically prefixed with a single quote (`'`), and values containing commas, quotes, or newlines are RFC 4180 quote-escaped.
+   - **Reason:** Satisfies `docs/security.md` section 6 and prevents CSV formula injection vulnerabilities (e.g. DDE or formula exploitation) when CSV files are opened in Microsoft Excel, Google Sheets, or LibreOffice Calc.
+
+4. **DEC-045: Offline Local-First Reporting Cache via IndexedDB**
+   - **Decision:** When reports are retrieved online, the full report snapshot is persisted to Dexie's `db.meta` store under key `report_cache_${shopId}_${period}`. When the device is offline or the backend RPC fails, the application falls back immediately to the cached snapshot with an amber banner: "You're offline. Showing last cached report numbers." If no cache exists, report aggregates are computed locally from cached Dexie orders and payments.
+   - **Reason:** Conforms to local-first architecture (`docs/03-app-flow.md` section 5 table row 5) ensuring owners can inspect business metrics even without an internet connection.
+
+
 
 
 
