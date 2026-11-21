@@ -31,3 +31,16 @@ enable_confirmations = false
 email_sent = 4
 sign_in_sign_ups = 30          # per 5 minutes per IP
 token_refresh = 150
+
+[functions.track-order]
+verify_jwt = false
+
+[functions.ai-parse-order]
+verify_jwt = false
+
+[functions.ai-status-draft]
+verify_jwt = false
+
+[functions.ai-insights]
+verify_jwt = false
+

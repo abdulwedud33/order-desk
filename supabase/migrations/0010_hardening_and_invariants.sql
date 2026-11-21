@@ -9,42 +9,34 @@
 -- order_payments, shop_memory, ai_usage, profiles, audit_log, rate_limits
 
 do $$
+declare
+  r record;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     -- Remove any unsafe tables if present
-    begin
-      alter publication supabase_realtime drop table if exists public.customers;
-      alter publication supabase_realtime drop table if exists public.order_contacts;
-      alter publication supabase_realtime drop table if exists public.repair_jobs;
-      alter publication supabase_realtime drop table if exists public.order_item_prices;
-      alter publication supabase_realtime drop table if exists public.order_payments;
-      alter publication supabase_realtime drop table if exists public.shop_memory;
-      alter publication supabase_realtime drop table if exists public.ai_usage;
-      alter publication supabase_realtime drop table if exists public.profiles;
-      alter publication supabase_realtime drop table if exists public.audit_log;
-      alter publication supabase_realtime drop table if exists public.rate_limits;
-      alter publication supabase_realtime drop table if exists public.order_counters;
-    exception when others then
-      null;
-    end;
+    for r in (
+      select tablename from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and tablename in (
+          'customers', 'order_contacts', 'repair_jobs', 'order_item_prices',
+          'order_payments', 'shop_memory', 'ai_usage', 'profiles',
+          'audit_log', 'rate_limits', 'order_counters'
+        )
+    ) loop
+      execute format('alter publication supabase_realtime drop table public.%I', r.tablename);
+    end loop;
 
     -- Add safe tables under RLS
-    begin
-      alter publication supabase_realtime add table public.orders;
-    exception when others then null;
-    end;
-    begin
-      alter publication supabase_realtime add table public.order_items;
-    exception when others then null;
-    end;
-    begin
-      alter publication supabase_realtime add table public.order_money;
-    exception when others then null;
-    end;
-    begin
-      alter publication supabase_realtime add table public.order_events;
-    exception when others then null;
-    end;
+    for r in (
+      select unnest(array['orders', 'order_items', 'order_money', 'order_events']) as tablename
+    ) loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and tablename = r.tablename
+      ) then
+        execute format('alter publication supabase_realtime add table public.%I', r.tablename);
+      end if;
+    end loop;
   end if;
 end $$;
 
@@ -81,27 +73,28 @@ grant select on table public.audit_log to authenticated;
 grant select on table public.repair_jobs_kitchen to authenticated;
 
 -- C. Column-level write grants where documentation explicitly permits
-grant insert (id, full_name, avatar_url, updated_at) on public.profiles to authenticated;
-grant update (full_name, avatar_url, updated_at) on public.profiles to authenticated;
+grant insert (id, full_name, phone, locale) on public.profiles to authenticated;
+grant update (full_name, phone, locale) on public.profiles to authenticated;
 
-grant insert (shop_id, name, sort) on public.catalog_categories to authenticated;
+grant insert (id, shop_id, name, sort) on public.catalog_categories to authenticated;
 grant update (name, sort) on public.catalog_categories to authenticated;
 grant delete on public.catalog_categories to authenticated;
 
-grant insert (shop_id, category_id, name, kind, price, prep_minutes, available, archived_at, updated_at) on public.catalog_items to authenticated;
-grant update (category_id, name, kind, price, prep_minutes, available, archived_at, updated_at) on public.catalog_items to authenticated;
+grant insert (id, shop_id, category_id, name, kind, price, prep_minutes, available) on public.catalog_items to authenticated;
+grant update (category_id, name, kind, price, prep_minutes, available, archived_at) on public.catalog_items to authenticated;
 
-grant insert (shop_id, name, phone, note, updated_at) on public.customers to authenticated;
-grant update (name, phone, note, updated_at) on public.customers to authenticated;
+grant insert (id, shop_id, name, phone, note) on public.customers to authenticated;
+grant update (name, phone, note) on public.customers to authenticated;
 
-grant insert (shop_id, kind, key, value, ref_id, updated_at) on public.shop_memory to authenticated;
-grant update (value, ref_id, updated_at) on public.shop_memory to authenticated;
+grant insert (shop_id, kind, key, value, ref_id) on public.shop_memory to authenticated;
+grant update (value, ref_id) on public.shop_memory to authenticated;
 grant delete on public.shop_memory to authenticated;
 
 -- D. Grant EXECUTE on trusted RPC functions to authenticated users
 grant execute on function public.my_role(uuid) to authenticated;
 grant execute on function public.is_member(uuid) to authenticated;
 grant execute on function public.has_role(uuid, public.member_role) to authenticated;
+grant execute on function public.has_role(uuid, public.member_role[]) to authenticated;
 grant execute on function public.create_shop(text, public.business_type, text, text) to authenticated;
 grant execute on function public.delete_shop(uuid) to authenticated;
 grant execute on function public.create_invite(uuid, public.member_role) to authenticated;
@@ -111,16 +104,19 @@ grant execute on function public.edit_order(uuid, uuid, uuid, integer, jsonb, te
 grant execute on function public.advance_order(uuid, uuid, public.order_status, public.order_status, uuid) to authenticated;
 grant execute on function public.assign_order(uuid, uuid, uuid, uuid) to authenticated;
 grant execute on function public.cancel_order(uuid, uuid, text, uuid) to authenticated;
-grant execute on function public.record_payment(uuid, uuid, uuid, public.payment_kind, numeric, public.payment_method, text) to authenticated;
+grant execute on function public.record_payment(uuid, uuid, uuid, public.payment_kind, numeric, public.pay_method, text) to authenticated;
 grant execute on function public.approve_estimate(uuid, uuid, uuid, numeric) to authenticated;
 grant execute on function public.handover_order(uuid, uuid, text, boolean, uuid) to authenticated;
 grant execute on function public.dashboard_summary(uuid, timestamptz, timestamptz) to authenticated;
 grant execute on function public.top_items(uuid, timestamptz, timestamptz, integer) to authenticated;
 grant execute on function public.orders_by_hour(uuid, timestamptz, timestamptz) to authenticated;
 grant execute on function public.late_orders(uuid, timestamptz, timestamptz, integer) to authenticated;
+grant execute on function public.repair_turnaround(uuid) to authenticated;
 grant execute on function public.repair_turnaround(uuid, timestamptz, timestamptz) to authenticated;
 grant execute on function public.orders_for_export(uuid, timestamptz, timestamptz) to authenticated;
-grant execute on function public.propose_order(uuid, jsonb) to authenticated;
+grant execute on function public.set_waiting_reason(uuid, uuid, text, uuid) to authenticated;
+grant execute on function public.set_settle_later(uuid, uuid, boolean, uuid) to authenticated;
+grant execute on function public.propose_order(uuid, public.order_type, jsonb, text, public.order_channel, text, int, uuid) to authenticated;
 
 -- Public tracking helper: service role only
 -- anon has zero execute privileges on track_order_lookup directly; edge function calls with service role.

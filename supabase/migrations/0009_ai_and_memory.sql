@@ -42,21 +42,21 @@ create policy memory_select on public.shop_memory
 
 create policy memory_insert on public.shop_memory
   for insert to authenticated
-  with check (public.has_role(shop_id, 'owner'));
+  with check (public.has_role(shop_id, 'owner'::public.member_role));
 
 create policy memory_update on public.shop_memory
   for update to authenticated
-  using (public.has_role(shop_id, 'owner'))
-  with check (public.has_role(shop_id, 'owner'));
+  using (public.has_role(shop_id, 'owner'::public.member_role))
+  with check (public.has_role(shop_id, 'owner'::public.member_role));
 
 create policy memory_delete on public.shop_memory
   for delete to authenticated
-  using (public.has_role(shop_id, 'owner'));
+  using (public.has_role(shop_id, 'owner'::public.member_role));
 
 -- ai_usage: owners can read their shop's usage; service role inserts
 create policy ai_usage_select on public.ai_usage
   for select to authenticated
-  using (public.has_role(shop_id, 'owner'));
+  using (public.has_role(shop_id, 'owner'::public.member_role));
 
 -- Column privileges
 revoke all on public.shop_memory from public, anon, authenticated;

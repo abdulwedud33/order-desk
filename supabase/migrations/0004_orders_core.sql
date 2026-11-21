@@ -98,6 +98,15 @@ create table if not exists public.order_transitions (
 );
 
 -- Trigger: order_events is append-only
+create or replace function public.check_ledger_immutable() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' and current_setting('app.shop_deletion', true) = 'on' then
+    return old;
+  end if;
+  raise exception 'LEDGER_IMMUTABLE' using errcode = '42501';
+end $$;
+
 drop trigger if exists order_events_immutable on public.order_events;
 create trigger order_events_immutable
   before update or delete on public.order_events

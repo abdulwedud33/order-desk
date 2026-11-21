@@ -1,6 +1,13 @@
 -- 0006_payments_ledger.sql
 -- Payments and deposits append-only ledger, triggers, RPCs, and RLS
 
+-- Single role overload for has_role
+create or replace function public.has_role(p_shop uuid, p_role public.member_role) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_role(p_shop, array[p_role]);
+$$;
+grant execute on function public.has_role(uuid, public.member_role) to authenticated;
+
 -- 1. Table: order_payments
 create table if not exists public.order_payments (
   id uuid primary key default gen_random_uuid(),
@@ -266,7 +273,7 @@ grant select on public.order_payments to authenticated;
 drop policy if exists order_payments_staff_read on public.order_payments;
 create policy order_payments_staff_read on public.order_payments
   for select to authenticated
-  using (public.has_role(shop_id, 'staff'));
+  using (public.has_role(shop_id, array['owner', 'staff']::public.member_role[]));
 
 -- Courier can read payments for assigned deliveries only
 drop policy if exists order_payments_courier_read on public.order_payments;
