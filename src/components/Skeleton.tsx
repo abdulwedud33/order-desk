@@ -33,6 +33,8 @@ export function SkeletonTicket() {
   );
 }
 
+export const SkeletonCard = SkeletonTicket;
+
 export function SkeletonRow() {
   return (
     <div className="flex items-center justify-between p-3 border-b border-line bg-surface">

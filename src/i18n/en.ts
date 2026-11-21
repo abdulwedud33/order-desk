@@ -75,6 +75,46 @@ export const en = {
   'customers.note': 'Customer Notes / Address',
   'customers.empty': 'No customers found.',
 
+  // Order Types
+  'order.dine_in': 'Dine-In',
+  'order.takeaway': 'Takeaway',
+  'order.delivery': 'Delivery',
+  'order.repair': 'Repair',
+
+  // Order Statuses
+  'status.new': 'New',
+  'status.accepted': 'Accepted',
+  'status.in_progress': 'In Progress',
+  'status.waiting': 'Waiting',
+  'status.ready': 'Ready',
+  'status.out_for_delivery': 'Out for Delivery',
+  'status.completed': 'Completed',
+  'status.cancelled': 'Cancelled',
+
+  // Orders UI
+  'orders.title': 'Orders',
+  'orders.newOrder': 'New Order',
+  'orders.selectType': 'Order Type',
+  'orders.items': 'Items',
+  'orders.addItem': 'Add Item',
+  'orders.total': 'Total',
+  'orders.subtotal': 'Subtotal',
+  'orders.deliveryFee': 'Delivery Fee',
+  'orders.promisedTime': 'Promised Time',
+  'orders.customer': 'Customer',
+  'orders.savedOnPhone': 'Saved on this phone',
+  'orders.syncing': 'Syncing...',
+  'orders.synced': 'Synced',
+  'orders.duplicateWarning': 'Duplicate warning: an order with this phone and items was created recently.',
+  'orders.createAnyway': 'Create Anyway',
+  'orders.viewExisting': 'View Existing',
+  'orders.createSuccess': 'Order created successfully',
+  'orders.tableOrLabel': 'Table or Callout Label',
+  'orders.notes': 'Order Notes',
+  'orders.channel': 'Intake Channel',
+  'orders.noOrders': 'No orders yet.',
+  'orders.reference': 'Ref',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'You do not have permission to perform this action.',
   'err.NOT_FOUND': 'The requested record could not be found.',

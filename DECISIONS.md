@@ -65,4 +65,27 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** Sync engine in `src/lib/sync.ts` pages PostgREST fetches in batches of 50 (`.range(from, from + 49)`) using the `updated_at` watermark.
    - **Reason:** Prevents PostgREST `max_rows` truncation issues and ensures smooth offline hydration into local Dexie IndexedDB.
 
+## Milestone M3 Decisions (2026-11-21)
+
+1. **DEC-014: Atomic Server-Side Day Numbering & Daily Letter Cycles (`next_order_no`)**
+   - **Decision:** Order numbers are generated exclusively server-side via `public.next_order_no(shop_id, date)`. The internal function locks/upserts `order_counters` to guarantee collision-free sequence numbers starting at 1 each day per shop. The display code combines a daily cycling letter (`chr(65 + (doy - 1) % 26)`) and a 3-digit padded number (`A-001`, `P-023`).
+   - **Reason:** Prevents client collisions and duplicate numbers across multiple concurrent devices and offline queues (`docs/02-technical-requirements.md` s4.4 & `docs/05-backend-schema.md` s6).
+
+2. **DEC-015: Server-Enforced Pricing & Non-Owner Client Override Isolation**
+   - **Decision:** In `create_order` and `edit_order`, prices for catalog items are always looked up and locked from `public.catalog_items`. If staff or a client payload provides a modified price for a catalog item, the server ignores it and enforces the catalog price. Only owners can override a catalog line item price.
+   - **Reason:** Enforces Non-negotiable Rule 3 and `docs/05-backend-schema.md`: business logic and financial calculations are determined by the database from trusted sources.
+
+3. **DEC-016: 128-Bit Unguessable Tracking Tokens in `order_contacts`**
+   - **Decision:** Generated during `create_order` via `translate(encode(gen_random_bytes(16), 'base64'), '+/=', '-_')` creating a URL-safe 22-character high-entropy token stored in `order_contacts.tracking_token`.
+   - **Reason:** Satisfies FR-T1 and `docs/05-backend-schema.md` s3.4 for customer tracking links without exposing customer phone numbers, addresses, or internal order numbers to unauthorized callers or kitchen staff.
+
+4. **DEC-017: Reactive Offline Dexie `useLiveQuery` Integration**
+   - **Decision:** Replaced static polling in `/orders` with Dexie's `useLiveQuery` hook. When orders are created offline or synced, Dexie automatically triggers re-rendering of the ticket list without full page reloads or router re-fetches.
+   - **Reason:** Delivers instant, sub-50ms feedback when saving orders offline and ensures seamless UI transitions even when the browser has zero network connectivity.
+
+5. **DEC-018: 10-Minute Duplicate Warning Algorithm (FR-O7)**
+   - **Decision:** `findDuplicateOrder` compares normalized digits of the customer phone and matching sets of item IDs/names created within 600,000 ms (10 minutes). If detected, an amber warning banner prompts staff with "Create Anyway" or "View Existing".
+   - **Reason:** Implements FR-O7 to prevent accidental double-entry from phone calls and chats while permitting intentional duplicate orders when confirmed.
+
+
 

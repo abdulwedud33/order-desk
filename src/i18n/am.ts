@@ -77,6 +77,46 @@ export const am: Record<MessageKey, string> = {
   'customers.note': 'ማስታወሻ / አድራሻ',
   'customers.empty': 'ምንም ደንበኞች አልተገኙም።',
 
+  // Order Types
+  'order.dine_in': 'እዚህ የሚበላ',
+  'order.takeaway': 'ይዞ መሄድ',
+  'order.delivery': 'ማድረስ',
+  'order.repair': 'ጥገና',
+
+  // Order Statuses
+  'status.new': 'አዲስ',
+  'status.accepted': 'ተቀባይነት አግኝቷል',
+  'status.in_progress': 'በመስራት ላይ',
+  'status.waiting': 'በመጠበቅ ላይ',
+  'status.ready': 'ዝግጁ',
+  'status.out_for_delivery': 'በመንገድ ላይ',
+  'status.completed': 'ተጠናቋል',
+  'status.cancelled': 'ተሰርዟል',
+
+  // Orders UI
+  'orders.title': 'ትዕዛዞች',
+  'orders.newOrder': 'አዲስ ትዕዛዝ',
+  'orders.selectType': 'የትዕዛዝ አይነት',
+  'orders.items': 'እቃዎች',
+  'orders.addItem': 'እቃ ጨምር',
+  'orders.total': 'ጠቅላላ',
+  'orders.subtotal': 'ንዑስ ድምር',
+  'orders.deliveryFee': 'የማድረሻ ክፍያ',
+  'orders.promisedTime': 'የቀጠሮ ሰዓት',
+  'orders.customer': 'ደንበኛ',
+  'orders.savedOnPhone': 'በዚህ ስልክ ላይ ተቀምጧል',
+  'orders.syncing': 'በመላክ ላይ...',
+  'orders.synced': 'ተልኳል',
+  'orders.duplicateWarning': 'ማስጠንቀቂያ፡ በዚህ ስልክ ቁጥር እና እቃዎች በቅርቡ ትዕዛዝ ተፈጥሯል!',
+  'orders.createAnyway': 'ቢሆንም ፍጠር',
+  'orders.viewExisting': 'ያለውን ተመልከት',
+  'orders.createSuccess': 'ትዕዛዙ በተሳካ ሁኔታ ተፈጥሯል',
+  'orders.tableOrLabel': 'የጠረጴዛ ወይም የጥሪ ስም',
+  'orders.notes': 'የትዕዛዝ ማስታወሻ',
+  'orders.channel': 'የትዕዛዝ መስመር',
+  'orders.noOrders': 'ምንም ትዕዛዝ የለም።',
+  'orders.reference': 'መለያ',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'ይህን እርምጃ ለመፈፀም ፈቃድ የለዎትም።',
   'err.NOT_FOUND': 'የተጠየቀው መረጃ አልተገኘም።',

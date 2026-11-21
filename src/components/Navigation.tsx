@@ -18,6 +18,17 @@ export function BottomNav() {
 
   if (!shop) return null;
 
+  // Hide BottomNav on full-screen creation and onboarding/auth flows
+  if (
+    pathname?.startsWith('/onboarding') ||
+    pathname?.startsWith('/auth') ||
+    pathname?.startsWith('/join') ||
+    pathname === '/orders/new' ||
+    pathname === '/new'
+  ) {
+    return null;
+  }
+
   let items: NavItem[] = [];
 
   if (role === 'owner') {

@@ -77,6 +77,46 @@ export const om: Record<MessageKey, string> = {
   'customers.note': 'Yaadannoo / Teessoo',
   'customers.empty': 'Maamiltootni hin argamne.',
 
+  // Order Types
+  'order.dine_in': 'Asitti nyaatamu',
+  'order.takeaway': 'Fudhatanii deemu',
+  'order.delivery': 'Geessuu',
+  'order.repair': 'Suphaa',
+
+  // Order Statuses
+  'status.new': 'Haaraa',
+  'status.accepted': 'Fudhatameera',
+  'status.in_progress': 'Hojjetamaa jira',
+  'status.waiting': 'Eegaa jira',
+  'status.ready': 'Qophaa’eera',
+  'status.out_for_delivery': 'Karaa irra jira',
+  'status.completed': 'Xumurameera',
+  'status.cancelled': 'Haqameera',
+
+  // Orders UI
+  'orders.title': 'Ajajoota',
+  'orders.newOrder': 'Ajaja Haaraa',
+  'orders.selectType': 'Gosa Ajajaa',
+  'orders.items': 'Meeshaalee',
+  'orders.addItem': 'Meeshaa Dabali',
+  'orders.total': 'Ida’ama',
+  'orders.subtotal': 'Ida’ama Xiqqaa',
+  'orders.deliveryFee': 'Kaffaltii Geessituu',
+  'orders.promisedTime': 'Yeroo Waadaa',
+  'orders.customer': 'Maamila',
+  'orders.savedOnPhone': 'Bilbila kana irratti olkaawameera',
+  'orders.syncing': 'Ergamaa jira...',
+  'orders.synced': 'Ergameera',
+  'orders.duplicateWarning': 'Akeekkachiisa: Lakkoofsa bilbilaa fi meeshaalee kanaan dhiyootti ajajni banameera.',
+  'orders.createAnyway': 'Haa ta’u bani',
+  'orders.viewExisting': 'Isa jiru ilaali',
+  'orders.createSuccess': 'Ajajni milkaa’inaan banameera',
+  'orders.tableOrLabel': 'Minjaala ykn Maqaa Waamichaa',
+  'orders.notes': 'Yaada Ajajaa',
+  'orders.channel': 'Karaa Ajajni Dhufe',
+  'orders.noOrders': 'Hamma ammaatti ajajni hin jiru.',
+  'orders.reference': 'Mallattoo',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'Tarkaanfii kana raawwachuuf hayyama hin qabdani.',
   'err.NOT_FOUND': 'Galmeen barbaaddan hin argamne.',

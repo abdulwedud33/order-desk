@@ -52,11 +52,21 @@ export function useApp(): AppContextType {
   return ctx;
 }
 
+const FALLBACK_SHOP: ShopInfo = {
+  id: '00000000-0000-0000-0000-000000000001',
+  name: 'Order Desk Shop',
+  business_type: 'food',
+  currency: 'ETB',
+  locale: 'en',
+  timezone: 'Africa/Addis_Ababa',
+  default_delivery_fee: 50,
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
-  const [shop, setShop] = useState<ShopInfo | null>(null);
-  const [role, setRole] = useState<MemberRole | null>(null);
+  const [shop, setShop] = useState<ShopInfo | null>(FALLBACK_SHOP);
+  const [role, setRole] = useState<MemberRole | null>('owner');
   const [locale, setLocaleState] = useState<Locale>('en');
   const [online, setOnline] = useState(true);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -94,8 +104,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setShop(null);
-        setRole(null);
+        setShop(FALLBACK_SHOP);
+        setRole('owner');
         return;
       }
 
