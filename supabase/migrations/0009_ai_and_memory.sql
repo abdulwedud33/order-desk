@@ -35,28 +35,28 @@ create index if not exists ai_usage_shop_idx on public.ai_usage (shop_id, create
 alter table public.shop_memory enable row level security;
 alter table public.ai_usage enable row level security;
 
--- shop_memory: all shop members can read; owners can insert, update, delete
+-- shop_memory: owner-only read, insert, update, delete
 create policy memory_select on public.shop_memory
   for select to authenticated
-  using (public.is_member(shop_id));
+  using (public.has_role(shop_id, 'owner'));
 
 create policy memory_insert on public.shop_memory
   for insert to authenticated
-  with check (public.has_role(shop_id, 'owner'::public.member_role));
+  with check (public.has_role(shop_id, 'owner'));
 
 create policy memory_update on public.shop_memory
   for update to authenticated
-  using (public.has_role(shop_id, 'owner'::public.member_role))
-  with check (public.has_role(shop_id, 'owner'::public.member_role));
+  using (public.has_role(shop_id, 'owner'))
+  with check (public.has_role(shop_id, 'owner'));
 
 create policy memory_delete on public.shop_memory
   for delete to authenticated
-  using (public.has_role(shop_id, 'owner'::public.member_role));
+  using (public.has_role(shop_id, 'owner'));
 
 -- ai_usage: owners can read their shop's usage; service role inserts
 create policy ai_usage_select on public.ai_usage
   for select to authenticated
-  using (public.has_role(shop_id, 'owner'::public.member_role));
+  using (public.has_role(shop_id, 'owner'));
 
 -- Column privileges
 revoke all on public.shop_memory from public, anon, authenticated;
@@ -78,17 +78,17 @@ declare
 begin
   if tg_op = 'INSERT' then
     if (select count(*) from public.shop_memory where shop_id = new.shop_id) >= 200 then
-      raise exception 'LIMIT_EXCEEDED' using message = 'Shop memory limit of 200 items reached';
+      raise exception 'LIMIT_EXCEEDED: Shop memory limit of 200 items reached' using errcode = '22023';
     end if;
 
     -- Content safety: memory must never contain raw phone numbers (docs/memory.md section 3)
     if new.value ~ v_phone_pattern or new.key ~ v_phone_pattern then
-      raise exception 'VALIDATION' using message = 'Memory items must not contain phone numbers';
+      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain phone numbers' using errcode = '23514';
     end if;
 
     -- Content safety: reject instruction-like phrases
     if new.value ~ v_injection_pattern or new.key ~ v_injection_pattern then
-      raise exception 'VALIDATION' using message = 'Memory items must not contain system instructions';
+      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain system instructions' using errcode = '23514';
     end if;
 
     new.created_by := (select auth.uid());
@@ -96,7 +96,7 @@ begin
     return new;
   elsif tg_op = 'UPDATE' then
     if new.value ~ v_phone_pattern or new.value ~ v_injection_pattern then
-      raise exception 'VALIDATION' using message = 'Memory items must not contain phone numbers or system instructions';
+      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain phone numbers or system instructions' using errcode = '23514';
     end if;
     perform public.write_audit(new.shop_id, 'memory_edited', 'shop_memory', new.id, jsonb_build_object('kind', new.kind, 'key', new.key));
     return new;
@@ -203,7 +203,7 @@ begin
   end if;
 
   if jsonb_array_length(p_items) > 20 then
-    raise exception 'LIMIT_EXCEEDED' using message = 'At most 20 order items allowed';
+    raise exception 'LIMIT_EXCEEDED: At most 20 order items allowed';
   end if;
 
   -- Recompute every line from database catalog (ignore client/model-supplied prices)
@@ -284,9 +284,31 @@ begin
   );
 end $$;
 
+-- 6b. Overload for propose_order taking a single JSON payload
+create or replace function public.propose_order(
+  p_shop uuid,
+  p_payload jsonb
+)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  return public.propose_order(
+    p_shop,
+    coalesce((p_payload->>'type')::public.order_type, 'walk_in'::public.order_type),
+    coalesce(p_payload->'items', '[]'::jsonb),
+    p_payload->>'label',
+    coalesce((p_payload->>'channel')::public.order_channel, 'walk_in'::public.order_channel),
+    p_payload->>'note',
+    (p_payload->>'due_in_minutes')::int,
+    (p_payload->>'customer_id')::uuid
+  );
+end $$;
+
 -- 7. Privileges
 revoke all on function public.track_order_lookup(text),
-                       public.propose_order(uuid, public.order_type, jsonb, text, public.order_channel, text, int, uuid) from public, anon;
+                       public.propose_order(uuid, public.order_type, jsonb, text, public.order_channel, text, int, uuid),
+                       public.propose_order(uuid, jsonb) from public, anon;
 
 grant execute on function public.track_order_lookup(text) to anon, authenticated;
 grant execute on function public.propose_order(uuid, public.order_type, jsonb, text, public.order_channel, text, int, uuid) to authenticated;
+grant execute on function public.propose_order(uuid, jsonb) to authenticated;

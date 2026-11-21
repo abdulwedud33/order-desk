@@ -8,13 +8,13 @@ returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   -- Disallow modifying immutable identifiers
   if NEW.id <> OLD.id or NEW.shop_id <> OLD.shop_id or NEW.order_no <> OLD.order_no or NEW.order_date <> OLD.order_date or NEW.created_by <> OLD.created_by then
-    raise exception 'FORBIDDEN' using message = 'Cannot modify immutable order fields (id, shop_id, order_no, order_date, created_by)';
+    raise exception 'FORBIDDEN: Cannot modify immutable order fields (id, shop_id, order_no, order_date, created_by)';
   end if;
 
   -- Disallow direct status changes outside RPCs setting transaction flag
   if NEW.status is distinct from OLD.status then
     if current_setting('order_desk.allow_status_change', true) is distinct from 'on' then
-      raise exception 'FORBIDDEN' using message = 'Status changes must go through advance_order or cancel_order RPCs';
+      raise exception 'FORBIDDEN: Status changes must go through advance_order or cancel_order RPCs';
     end if;
   end if;
 
@@ -63,7 +63,7 @@ begin
 
   -- Concurrency check on status
   if v_o.status <> p_expected_from then
-    raise exception 'CONFLICT' using message = 'Order status changed from expected ' || p_expected_from || ' to ' || v_o.status;
+    raise exception 'CONFLICT: Order status changed from expected % to %', p_expected_from, v_o.status;
   end if;
 
   -- Transition check
@@ -74,29 +74,29 @@ begin
       and t.to_status = p_to
       and v_role = any (t.roles)
   ) then
-    raise exception 'INVALID_TRANSITION' using message = 'Transition from ' || v_o.status || ' to ' || p_to || ' not allowed for role ' || v_role;
+    raise exception 'INVALID_TRANSITION: Transition from % to % not allowed for role %', v_o.status, p_to, v_role;
   end if;
 
   -- Role boundary check: courier only on assigned orders
   if v_role = 'courier' and v_o.assigned_to is distinct from v_uid then
-    raise exception 'FORBIDDEN' using message = 'Couriers can only advance orders assigned to them';
+    raise exception 'FORBIDDEN: Couriers can only advance orders assigned to them';
   end if;
 
   -- Role boundary check: kitchen only accepts/starts/readies/waits
   if v_role = 'kitchen' and p_to not in ('accepted', 'in_progress', 'ready', 'waiting') then
-    raise exception 'FORBIDDEN' using message = 'Kitchen role cannot advance order to ' || p_to;
+    raise exception 'FORBIDDEN: Kitchen role cannot advance order to %', p_to;
   end if;
 
   -- Delivery checks
   if v_o.type = 'delivery' and p_to = 'out_for_delivery' and v_o.assigned_to is null then
-    raise exception 'VALIDATION' using message = 'Delivery order must be assigned to a courier before out_for_delivery';
+    raise exception 'VALIDATION: Delivery order must be assigned to a courier before out_for_delivery';
   end if;
 
   -- Completed checks: balance zero or settle_later
   if p_to = 'completed' and not v_o.settle_later then
     select coalesce(total - paid_amount, 0) into v_balance from public.order_money where order_id = p_order;
     if v_balance > 0 then
-      raise exception 'VALIDATION' using message = 'Order has outstanding balance; settle payment or flag settle_later';
+      raise exception 'VALIDATION: Order has outstanding balance; settle payment or flag settle_later';
     end if;
   end if;
 
@@ -153,11 +153,11 @@ begin
 
   select role into v_target_role from public.shop_members where shop_id = p_shop and user_id = p_user;
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Assignee not found in shop members';
+    raise exception 'NOT_FOUND: Assignee not found in shop members';
   end if;
 
   if v_o.type = 'delivery' and v_target_role <> 'courier' then
-    raise exception 'VALIDATION' using message = 'Delivery assignee must be a courier';
+    raise exception 'VALIDATION: Delivery assignee must be a courier';
   end if;
 
   update public.orders
@@ -206,11 +206,11 @@ begin
   end if;
 
   if v_o.status in ('completed', 'cancelled') then
-    raise exception 'INVALID_TRANSITION' using message = 'Cannot cancel order in status ' || v_o.status;
+    raise exception 'INVALID_TRANSITION: Cannot cancel order in status %', v_o.status;
   end if;
 
   if p_reason is null or char_length(trim(p_reason)) < 3 or char_length(trim(p_reason)) > 200 then
-    raise exception 'VALIDATION' using message = 'Cancel reason must be between 3 and 200 characters';
+    raise exception 'VALIDATION: Cancel reason must be between 3 and 200 characters';
   end if;
 
   select coalesce(paid_amount, 0) into v_paid from public.order_money where order_id = p_order;

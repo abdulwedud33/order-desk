@@ -118,13 +118,13 @@ begin
 
   -- 4. Validate items array
   if p_items is null or jsonb_array_length(p_items) = 0 then
-    raise exception 'VALIDATION' using message = 'At least one item is required';
+    raise exception 'VALIDATION: At least one item is required';
   end if;
 
   -- 5. Validate repair fields if repair order
   if p_type = 'repair' then
     if p_repair is null then
-      raise exception 'VALIDATION' using message = 'Repair details are required for repair orders';
+      raise exception 'VALIDATION: Repair details are required for repair orders';
     end if;
 
     v_device := btrim(coalesce(p_repair->>'device', ''));
@@ -133,10 +133,10 @@ begin
     v_pickup_code := upper(btrim(coalesce(p_repair->>'pickup_code', '')));
 
     if char_length(v_device) not between 1 and 120 then
-      raise exception 'VALIDATION' using message = 'Device name is required (1-120 chars)';
+      raise exception 'VALIDATION: Device name is required (1-120 chars)';
     end if;
     if char_length(v_problem) not between 1 and 500 then
-      raise exception 'VALIDATION' using message = 'Problem description is required (1-500 chars)';
+      raise exception 'VALIDATION: Problem description is required (1-500 chars)';
     end if;
 
     -- Generate a 4-digit numeric pickup code if none provided
@@ -186,12 +186,12 @@ begin
   loop
     v_item_name := trim(v_item->>'name');
     if v_item_name is null or char_length(v_item_name) = 0 then
-      raise exception 'VALIDATION' using message = 'Item name is required';
+      raise exception 'VALIDATION: Item name is required';
     end if;
 
     v_item_qty := coalesce((v_item->>'qty')::numeric, 1);
     if v_item_qty <= 0 or v_item_qty > 10000 then
-      raise exception 'VALIDATION' using message = 'Invalid item quantity';
+      raise exception 'VALIDATION: Invalid item quantity';
     end if;
 
     v_item_note := v_item->>'note';
@@ -204,7 +204,7 @@ begin
       where id = v_item_id and shop_id = p_shop and archived_at is null;
 
       if not found then
-        raise exception 'NOT_FOUND' using message = 'Catalog item not found';
+        raise exception 'NOT_FOUND: Catalog item not found';
       end if;
 
       if v_role = 'owner' and (v_item->>'price') is not null then
@@ -217,7 +217,7 @@ begin
     end if;
 
     if v_item_price < 0 then
-      raise exception 'VALIDATION' using message = 'Price cannot be negative';
+      raise exception 'VALIDATION: Price cannot be negative';
     end if;
 
     v_order_item_id := gen_random_uuid();
@@ -238,7 +238,7 @@ begin
   values (p_id, p_shop, v_subtotal, coalesce(p_delivery_fee, 0), v_total, 0);
 
   -- 12. Create contact record with 128-bit random base64url tracking token
-  v_tracking_token := encode(gen_random_bytes(16), 'base64');
+  v_tracking_token := encode(extensions.gen_random_bytes(16), 'base64');
   v_tracking_token := replace(replace(replace(v_tracking_token, '+', '-'), '/', '_'), '=', '');
 
   v_phone := p_contact->>'phone';
@@ -328,7 +328,7 @@ begin
 
   -- 6. Edit gate: allowed only until ready
   if v_order.status in ('ready', 'out_for_delivery', 'completed', 'cancelled') then
-    raise exception 'INVALID_TRANSITION' using message = 'Orders can only be edited before ready';
+    raise exception 'INVALID_TRANSITION: Orders can only be edited before ready';
   end if;
 
   -- 7. Snapshot previous state
@@ -346,12 +346,12 @@ begin
     loop
       v_item_name := trim(v_item->>'name');
       if v_item_name is null or char_length(v_item_name) = 0 then
-        raise exception 'VALIDATION' using message = 'Item name is required';
+        raise exception 'VALIDATION: Item name is required';
       end if;
 
       v_item_qty := coalesce((v_item->>'qty')::numeric, 1);
       if v_item_qty <= 0 or v_item_qty > 10000 then
-        raise exception 'VALIDATION' using message = 'Invalid item quantity';
+        raise exception 'VALIDATION: Invalid item quantity';
       end if;
 
       v_item_note := v_item->>'note';
@@ -364,7 +364,7 @@ begin
         where id = v_item_id and shop_id = p_shop and archived_at is null;
 
         if not found then
-          raise exception 'NOT_FOUND' using message = 'Catalog item not found';
+          raise exception 'NOT_FOUND: Catalog item not found';
         end if;
 
         if v_role = 'owner' and (v_item->>'price') is not null then
@@ -377,7 +377,7 @@ begin
       end if;
 
       if v_item_price < 0 then
-        raise exception 'VALIDATION' using message = 'Price cannot be negative';
+        raise exception 'VALIDATION: Price cannot be negative';
       end if;
 
       v_order_item_id := gen_random_uuid();
@@ -395,7 +395,7 @@ begin
 
     -- Check overpayment
     if v_paid > v_total then
-      raise exception 'OVERPAYMENT' using message = 'Paid amount exceeds new total';
+      raise exception 'OVERPAYMENT: Paid amount exceeds new total';
     end if;
 
     update public.order_money
@@ -496,11 +496,11 @@ begin
     raise exception 'NOT_FOUND';
   end if;
   if v_order.type <> 'repair' then
-    raise exception 'VALIDATION' using message = 'Estimate approval is only valid for repair orders';
+    raise exception 'VALIDATION: Estimate approval is only valid for repair orders';
   end if;
 
   if p_total is null or p_total < 0 then
-    raise exception 'VALIDATION' using message = 'Approved total cannot be negative';
+    raise exception 'VALIDATION: Approved total cannot be negative';
   end if;
 
   -- 5. Update repair_jobs
@@ -513,7 +513,7 @@ begin
   returning * into v_repair;
 
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Repair job not found';
+    raise exception 'NOT_FOUND: Repair job not found';
   end if;
 
   -- 6. If order was waiting due to estimate exceeded, and new approved total covers current total, clear waiting
@@ -567,7 +567,7 @@ begin
 
   -- 2. Owner override check: ONLY owner can override pickup code
   if coalesce(p_override, false) and v_role <> 'owner' then
-    raise exception 'FORBIDDEN' using message = 'Only owners may override pickup code verification';
+    raise exception 'FORBIDDEN: Only owners may override pickup code verification';
   end if;
 
   -- 3. Rate limit
@@ -586,7 +586,7 @@ begin
   end if;
 
   if v_order.type <> 'repair' then
-    raise exception 'VALIDATION' using message = 'Handover is only valid for repair orders';
+    raise exception 'VALIDATION: Handover is only valid for repair orders';
   end if;
 
   if v_order.status = 'completed' then
@@ -594,24 +594,24 @@ begin
   end if;
 
   if v_order.status <> 'ready' then
-    raise exception 'INVALID_TRANSITION' using message = 'Order must be in ready status for handover';
+    raise exception 'INVALID_TRANSITION: Order must be in ready status for handover';
   end if;
 
   -- 6. Lock and check repair job
   select * into v_repair from public.repair_jobs where order_id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Repair job record not found';
+    raise exception 'NOT_FOUND: Repair job record not found';
   end if;
 
   -- 7. Pickup code verification
   if not coalesce(p_override, false) then
     if p_code is null or btrim(p_code) = '' then
-      raise exception 'INVALID_CODE' using message = 'Pickup code is required';
+      raise exception 'INVALID_CODE: Pickup code is required';
     end if;
 
     v_input_hash := sha256(convert_to(upper(btrim(p_code)), 'UTF8'));
     if v_input_hash <> v_repair.pickup_code_hash then
-      raise exception 'INVALID_CODE' using message = 'Invalid pickup code';
+      raise exception 'INVALID_CODE: Invalid pickup code';
     end if;
   end if;
 
@@ -622,7 +622,7 @@ begin
   where m.order_id = p_order;
 
   if (v_total - v_paid > 0) and not coalesce(v_settle_later, false) then
-    raise exception 'VALIDATION' using message = 'Order has an unpaid balance. Collect payment or enable Settle Later to complete';
+    raise exception 'VALIDATION: Order has an unpaid balance. Collect payment or enable Settle Later to complete';
   end if;
 
   -- 9. Update repair job record

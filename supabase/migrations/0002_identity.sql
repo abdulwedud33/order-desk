@@ -88,6 +88,16 @@ language sql stable security definer set search_path = '' as $$
   );
 $$;
 
+create function public.has_role(p_shop uuid, p_role text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_role(p_shop, array[p_role::public.member_role]);
+$$;
+
+create function public.has_role(p_shop uuid, p_role public.member_role) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_role(p_shop, array[p_role]);
+$$;
+
 create function public.can_see_order(p_shop uuid, p_assigned uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select case public.my_role(p_shop)
@@ -109,9 +119,13 @@ $$;
 
 revoke all on function public.my_role(uuid), public.is_member(uuid), public.is_owner(uuid),
                        public.has_role(uuid, public.member_role[]),
+                       public.has_role(uuid, text),
+                       public.has_role(uuid, public.member_role),
                        public.can_see_order(uuid, uuid), public.can_see_sensitive(uuid, uuid) from public, anon;
 grant execute on function public.my_role(uuid), public.is_member(uuid), public.is_owner(uuid),
                           public.has_role(uuid, public.member_role[]),
+                          public.has_role(uuid, text),
+                          public.has_role(uuid, public.member_role),
                           public.can_see_order(uuid, uuid), public.can_see_sensitive(uuid, uuid) to authenticated;
 
 -- Internal audit writer

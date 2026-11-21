@@ -108,13 +108,12 @@ select public.create_order(
   'walk_in'::public.order_channel,
   'No spicy',
   now() + interval '30 minutes',
-  false,
   jsonb_build_array(
-    jsonb_build_object('name', 'Special Tibs', 'qty', 1, 'unit_price', 350.00),
-    jsonb_build_object('name', 'Mineral Water', 'qty', 1, 'unit_price', 50.00)
+    jsonb_build_object('name', 'Special Tibs', 'qty', 1, 'price', 350.00),
+    jsonb_build_object('name', 'Mineral Water', 'qty', 1, 'price', 50.00)
   ),
-  0,
   null,
+  0,
   null,
   null
 );
@@ -145,12 +144,11 @@ select public.create_order(
   'phone'::public.order_channel,
   'Pack separately',
   now() - interval '10 minutes', -- Past due (Late order test)
-  false,
   jsonb_build_array(
-    jsonb_build_object('name', 'Burger Combo', 'qty', 1, 'unit_price', 200.00)
+    jsonb_build_object('name', 'Burger Combo', 'qty', 1, 'price', 200.00)
   ),
-  0,
   null,
+  0,
   null,
   null
 );

@@ -2,6 +2,12 @@
 -- Payments and deposits append-only ledger, triggers, RPCs, and RLS
 
 -- Single role overload for has_role
+create or replace function public.has_role(p_shop uuid, p_role text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_role(p_shop, array[p_role::public.member_role]);
+$$;
+grant execute on function public.has_role(uuid, text) to authenticated;
+
 create or replace function public.has_role(p_shop uuid, p_role public.member_role) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.has_role(p_shop, array[p_role]);
@@ -40,7 +46,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   if old.paid_amount is distinct from new.paid_amount then
     if current_setting('order_desk.allow_paid_amount_change', true) is distinct from 'on' then
-      raise exception 'FORBIDDEN' using message = 'paid_amount can only be modified by the payment ledger trigger';
+      raise exception 'FORBIDDEN: paid_amount can only be modified by the payment ledger trigger';
     end if;
   end if;
   return new;
@@ -104,13 +110,13 @@ begin
 
   -- Refunds are strictly owner-only
   if p_kind = 'refund' and v_role <> 'owner' then
-    raise exception 'FORBIDDEN' using message = 'Refunds can only be recorded by shop owners';
+    raise exception 'FORBIDDEN: Refunds can only be recorded by shop owners';
   end if;
 
   -- Courier role can only record cash payments on their assigned delivery orders
   if v_role = 'courier' then
     if p_kind <> 'payment' or p_method <> 'cash' then
-      raise exception 'FORBIDDEN' using message = 'Couriers can only record cash payments';
+      raise exception 'FORBIDDEN: Couriers can only record cash payments';
     end if;
   end if;
 
@@ -123,11 +129,11 @@ begin
 
   -- 3. Input validation
   if p_amount is null or p_amount <= 0 then
-    raise exception 'VALIDATION' using message = 'Payment amount must be greater than zero';
+    raise exception 'VALIDATION: Payment amount must be greater than zero';
   end if;
 
   if p_kind = 'refund' and v_trimmed_note is null then
-    raise exception 'VALIDATION' using message = 'Refund requires a note explaining the reason';
+    raise exception 'VALIDATION: Refund requires a note explaining the reason';
   end if;
 
   -- 4. Idempotency replay check
@@ -141,34 +147,34 @@ begin
   -- 5. Lock order and order_money
   select * into v_order from public.orders where id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Order not found';
+    raise exception 'NOT_FOUND: Order not found';
   end if;
 
   if v_order.status = 'cancelled' then
-    raise exception 'VALIDATION' using message = 'Cannot record payment on cancelled order';
+    raise exception 'VALIDATION: Cannot record payment on cancelled order';
   end if;
 
   -- If courier, verify assigned delivery order
   if v_role = 'courier' then
     if v_order.type <> 'delivery' or v_order.assigned_to is distinct from v_uid then
-      raise exception 'FORBIDDEN' using message = 'Courier can only record payment on assigned delivery order';
+      raise exception 'FORBIDDEN: Courier can only record payment on assigned delivery order';
     end if;
   end if;
 
   select * into v_money from public.order_money where order_id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Order money record not found';
+    raise exception 'NOT_FOUND: Order money record not found';
   end if;
 
   -- 6. Financial validation: Overpayment and Refund caps
   if p_kind in ('payment', 'deposit') then
     v_balance := v_money.total - v_money.paid_amount;
     if p_amount > v_balance then
-      raise exception 'OVERPAYMENT' using message = 'Payment exceeds outstanding balance';
+      raise exception 'OVERPAYMENT: Payment exceeds outstanding balance';
     end if;
   elsif p_kind = 'refund' then
     if p_amount > v_money.paid_amount then
-      raise exception 'OVERPAYMENT' using message = 'Refund exceeds paid amount';
+      raise exception 'OVERPAYMENT: Refund exceeds paid amount';
     end if;
   end if;
 
@@ -217,6 +223,20 @@ begin
   return v_money;
 end $$;
 
+-- 5b. Overload for record_payment with client_id at the end
+create or replace function public.record_payment(
+  p_shop uuid,
+  p_order uuid,
+  p_kind public.payment_kind,
+  p_amount numeric,
+  p_method public.pay_method,
+  p_note text default null,
+  p_client_id uuid default null
+) returns public.order_money as $$
+  select public.record_payment(p_shop, p_order, coalesce(p_client_id, gen_random_uuid()), p_kind, p_amount, p_method, p_note);
+$$ language sql security definer set search_path = '';
+grant execute on function public.record_payment(uuid, uuid, public.payment_kind, numeric, public.pay_method, text, uuid) to authenticated;
+
 -- 6. RPC: set_settle_later
 create or replace function public.set_settle_later(
   p_shop uuid,
@@ -239,7 +259,7 @@ begin
 
   select * into v_o from public.orders where id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND' using message = 'Order not found';
+    raise exception 'NOT_FOUND: Order not found';
   end if;
 
   update public.orders

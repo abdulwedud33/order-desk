@@ -106,12 +106,12 @@ select set_config('request.jwt.claim.sub', :'u_staff', true);
 
 select lives_ok(
   format($q$
-    select public.propose_order(%L::uuid, '{
-      "type": "dine_in",
-      "items": [
-        {"item_id": %L, "qty": 2, "price": 0.00}
-      ]
-    }'::jsonb)
+    select public.propose_order(%L::uuid, jsonb_build_object(
+      'type', 'dine_in',
+      'items', jsonb_build_array(
+        jsonb_build_object('item_id', %L::uuid, 'qty', 2, 'price', 0.00)
+      )
+    ))
   $q$, :'shop_id', :'item_id'),
   'Staff can run propose_order'
 );

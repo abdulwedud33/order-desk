@@ -319,13 +319,13 @@ begin
 
   -- 4. Validate items array
   if p_items is null or jsonb_array_length(p_items) = 0 then
-    raise exception 'VALIDATION' using message = 'At least one item is required';
+    raise exception 'VALIDATION: At least one item is required';
   end if;
 
   -- 5. Determine shop date from shop timezone
   select timezone into v_tz from public.shops where id = p_shop;
   if not found then
-    raise exception 'NOT_FOUND';
+    raise exception 'NOT_FOUND: Shop not found';
   end if;
   v_date := (now() at time zone coalesce(v_tz, 'Africa/Addis_Ababa'))::date;
 
@@ -351,12 +351,12 @@ begin
   loop
     v_item_name := trim(v_item->>'name');
     if v_item_name is null or char_length(v_item_name) = 0 then
-      raise exception 'VALIDATION' using message = 'Item name is required';
+      raise exception 'VALIDATION: Item name is required';
     end if;
 
     v_item_qty := coalesce((v_item->>'qty')::numeric, 1);
     if v_item_qty <= 0 or v_item_qty > 10000 then
-      raise exception 'VALIDATION' using message = 'Invalid item quantity';
+      raise exception 'VALIDATION: Invalid item quantity';
     end if;
 
     v_item_note := v_item->>'note';
@@ -369,7 +369,7 @@ begin
       where id = v_item_id and shop_id = p_shop and archived_at is null;
 
       if not found then
-        raise exception 'NOT_FOUND' using message = 'Catalog item not found';
+        raise exception 'NOT_FOUND: Catalog item not found';
       end if;
 
       -- Pricing rule: only owner may override catalog price. Staff/clients cannot override.
@@ -384,7 +384,7 @@ begin
     end if;
 
     if v_item_price < 0 then
-      raise exception 'VALIDATION' using message = 'Price cannot be negative';
+      raise exception 'VALIDATION: Price cannot be negative';
     end if;
 
     v_order_item_id := gen_random_uuid();
@@ -405,7 +405,7 @@ begin
   values (p_id, p_shop, v_subtotal, coalesce(p_delivery_fee, 0), v_total, 0);
 
   -- 10. Contact and unguessable tracking token (128-bit random base64url)
-  v_tracking_token := translate(encode(gen_random_bytes(16), 'base64'), '+/=', '-_');
+  v_tracking_token := translate(encode(extensions.gen_random_bytes(16), 'base64'), '+/=', '-_');
   v_phone := p_contact->>'phone';
   v_address := p_contact->>'address';
   v_address_note := p_contact->>'address_note';
@@ -489,7 +489,7 @@ begin
 
   -- 6. Status check: Allowed until ready (cannot edit if ready, out_for_delivery, completed, cancelled)
   if v_order.status in ('ready', 'out_for_delivery', 'completed', 'cancelled') then
-    raise exception 'INVALID_TRANSITION' using message = 'Cannot edit order in status ' || v_order.status;
+    raise exception 'INVALID_TRANSITION: Cannot edit order in status %', v_order.status;
   end if;
 
   -- 7. Snapshot previous state for event meta
@@ -515,12 +515,12 @@ begin
     loop
       v_item_name := trim(v_item->>'name');
       if v_item_name is null or char_length(v_item_name) = 0 then
-        raise exception 'VALIDATION' using message = 'Item name is required';
+        raise exception 'VALIDATION: Item name is required';
       end if;
 
       v_item_qty := coalesce((v_item->>'qty')::numeric, 1);
       if v_item_qty <= 0 or v_item_qty > 10000 then
-        raise exception 'VALIDATION' using message = 'Invalid item quantity';
+        raise exception 'VALIDATION: Invalid item quantity';
       end if;
 
       v_item_note := v_item->>'note';
@@ -533,7 +533,7 @@ begin
         where id = v_item_id and shop_id = p_shop and archived_at is null;
 
         if not found then
-          raise exception 'NOT_FOUND' using message = 'Catalog item not found';
+          raise exception 'NOT_FOUND: Catalog item not found';
         end if;
 
         if v_role = 'owner' and (v_item->>'price') is not null then
@@ -546,7 +546,7 @@ begin
       end if;
 
       if v_item_price < 0 then
-        raise exception 'VALIDATION' using message = 'Price cannot be negative';
+        raise exception 'VALIDATION: Price cannot be negative';
       end if;
 
       v_order_item_id := gen_random_uuid();
@@ -564,7 +564,7 @@ begin
 
     -- Check overpayment
     if v_paid > v_total then
-      raise exception 'OVERPAYMENT' using message = 'Paid amount exceeds new total';
+      raise exception 'OVERPAYMENT: Paid amount exceeds new total';
     end if;
 
     update public.order_money

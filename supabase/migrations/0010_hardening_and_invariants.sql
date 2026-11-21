@@ -90,11 +90,19 @@ grant insert (shop_id, kind, key, value, ref_id) on public.shop_memory to authen
 grant update (value, ref_id) on public.shop_memory to authenticated;
 grant delete on public.shop_memory to authenticated;
 
+grant update on public.orders to authenticated;
+grant update on public.order_money to authenticated;
+
 -- D. Grant EXECUTE on trusted RPC functions to authenticated users
 grant execute on function public.my_role(uuid) to authenticated;
 grant execute on function public.is_member(uuid) to authenticated;
+grant execute on function public.is_owner(uuid) to authenticated;
+grant execute on function public.has_role(uuid, text) to authenticated;
 grant execute on function public.has_role(uuid, public.member_role) to authenticated;
 grant execute on function public.has_role(uuid, public.member_role[]) to authenticated;
+grant execute on function public.can_see_order(uuid, uuid) to authenticated;
+grant execute on function public.can_see_sensitive(uuid, uuid) to authenticated;
+grant execute on function public.next_order_no(uuid, date) to authenticated;
 grant execute on function public.create_shop(text, public.business_type, text, text) to authenticated;
 grant execute on function public.delete_shop(uuid) to authenticated;
 grant execute on function public.create_invite(uuid, public.member_role) to authenticated;
@@ -105,6 +113,7 @@ grant execute on function public.advance_order(uuid, uuid, public.order_status, 
 grant execute on function public.assign_order(uuid, uuid, uuid, uuid) to authenticated;
 grant execute on function public.cancel_order(uuid, uuid, text, uuid) to authenticated;
 grant execute on function public.record_payment(uuid, uuid, uuid, public.payment_kind, numeric, public.pay_method, text) to authenticated;
+grant execute on function public.record_payment(uuid, uuid, public.payment_kind, numeric, public.pay_method, text, uuid) to authenticated;
 grant execute on function public.approve_estimate(uuid, uuid, uuid, numeric) to authenticated;
 grant execute on function public.handover_order(uuid, uuid, text, boolean, uuid) to authenticated;
 grant execute on function public.dashboard_summary(uuid, timestamptz, timestamptz) to authenticated;
@@ -117,6 +126,7 @@ grant execute on function public.orders_for_export(uuid, timestamptz, timestampt
 grant execute on function public.set_waiting_reason(uuid, uuid, text, uuid) to authenticated;
 grant execute on function public.set_settle_later(uuid, uuid, boolean, uuid) to authenticated;
 grant execute on function public.propose_order(uuid, public.order_type, jsonb, text, public.order_channel, text, int, uuid) to authenticated;
+grant execute on function public.propose_order(uuid, jsonb) to authenticated;
 
 -- Public tracking helper: service role only
 -- anon has zero execute privileges on track_order_lookup directly; edge function calls with service role.
@@ -195,7 +205,12 @@ begin
   from public.order_money m
   where (p_shop_id is null or m.shop_id = p_shop_id)
     and m.total <> coalesce(
-      (select sum(i.qty * i.unit_price) from public.order_items i where i.order_id = m.order_id),
+      (
+        select sum(i.qty * p.unit_price)
+        from public.order_items i
+        join public.order_item_prices p on p.order_item_id = i.id
+        where i.order_id = m.order_id
+      ),
       0
     ) + m.delivery_fee;
 
