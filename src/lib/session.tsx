@@ -37,6 +37,7 @@ interface AppContextType {
   online: boolean;
   toasts: ToastItem[];
   setLocale: (l: Locale) => void;
+  setRole: (r: MemberRole | null) => void;
   t: (key: MessageKey, params?: Record<string, string | number>) => string;
   errorText: (e: unknown) => string;
   showToast: (message: string, actionLabel?: string, onAction?: () => void) => void;
@@ -76,6 +77,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const savedLocale = localStorage.getItem('od-locale') as Locale;
       if (savedLocale && ['en', 'am', 'om'].includes(savedLocale)) {
         setLocaleState(savedLocale);
+      }
+      const savedRole = localStorage.getItem('od-role') as MemberRole;
+      if (savedRole && ['owner', 'staff', 'kitchen', 'courier'].includes(savedRole)) {
+        setRole(savedRole);
       }
     } catch {}
   }, []);
@@ -185,6 +190,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         online,
         toasts,
         setLocale,
+        setRole: (r: MemberRole | null) => {
+          setRole(r);
+          try {
+            if (r) localStorage.setItem('od-role', r);
+            else localStorage.removeItem('od-role');
+          } catch {}
+        },
         t,
         errorText,
         showToast,

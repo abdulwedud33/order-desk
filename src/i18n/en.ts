@@ -212,6 +212,33 @@ export const en = {
   'repair.avgTurnaround': 'Avg Turnaround',
   'repair.copyUpdate': 'Copy Update Message',
   'repair.updateCopied': 'Update message copied to clipboard',
+
+  // Delivery & Courier (M7)
+  'delivery.title': 'My Deliveries',
+  'delivery.active': 'Active',
+  'delivery.completed': 'Completed',
+  'delivery.assign': 'Assign',
+  'delivery.assignCourier': 'Assign Courier',
+  'delivery.assignTitle': 'Assign Delivery to Courier',
+  'delivery.assignedTo': 'Assigned to {name}',
+  'delivery.unassigned': 'Unassigned',
+  'delivery.call': 'Call',
+  'delivery.map': 'Map',
+  'delivery.address': 'Address',
+  'delivery.amountToCollect': 'To Collect',
+  'delivery.paidInFull': 'Paid in Full',
+  'delivery.pickedUp': 'Picked Up',
+  'delivery.delivered': 'Delivered',
+  'delivery.cashCollected': 'Cash Collected',
+  'delivery.enterCash': 'Confirm Cash Collected',
+  'delivery.enterCashPrompt': 'Enter the cash amount collected from the customer upon delivery:',
+  'delivery.noDeliveries': 'No active deliveries assigned. New delivery assignments will appear here.',
+  'delivery.noCouriers': 'No couriers found in shop team. Invite couriers via More > Team.',
+  'delivery.selectCourier': 'Select a courier',
+  'delivery.confirmAndComplete': 'Confirm & Complete Delivery',
+  'delivery.assignSuccess': 'Courier assigned successfully',
+  'delivery.deliverySuccess': 'Delivery completed successfully',
+  'delivery.pickedUpSuccess': 'Order marked as picked up',
 };
 
 export type MessageKey = keyof typeof en;

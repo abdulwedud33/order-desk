@@ -147,6 +147,48 @@ export async function pullRecentOrders(shopId: string): Promise<void> {
       });
     }
   }
+
+  // Also pull order_contacts for these orders
+  const { data: contacts } = await supabase
+    .from('order_contacts')
+    .select('order_id, shop_id, phone, address, address_note, tracking_token')
+    .eq('shop_id', shopId)
+    .limit(PAGE_SIZE);
+
+  if (contacts) {
+    for (const c of contacts) {
+      await db.order_contacts.put({
+        order_id: c.order_id,
+        shop_id: c.shop_id,
+        phone: c.phone,
+        address: c.address,
+        address_note: c.address_note,
+        tracking_token: c.tracking_token,
+      });
+    }
+  }
+
+  // Also pull order_items for these orders
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('id, order_id, shop_id, item_id, name, qty, unit_price, note')
+    .eq('shop_id', shopId)
+    .limit(PAGE_SIZE * 5);
+
+  if (items) {
+    for (const i of items) {
+      await db.order_items.put({
+        id: i.id,
+        order_id: i.order_id,
+        shop_id: i.shop_id,
+        item_id: i.item_id,
+        name: i.name,
+        qty: i.qty,
+        unit_price: Number(i.unit_price || 0),
+        note: i.note,
+      });
+    }
+  }
 }
 
 // ----------------- Offline Outbox Operations -----------------
@@ -552,6 +594,38 @@ export async function queueSetWaitingReason(
   kickSync(shopId);
 }
 
+export async function queueAssignOrder(
+  shopId: string,
+  orderId: string,
+  courierUserId: string
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'assign_order',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_user: courierUserId,
+      p_client_id: clientId,
+    },
+  });
+
+  await db.transaction('rw', [db.orders, db.outbox], async () => {
+    await db.orders.update(orderId, {
+      assigned_to: courierUserId,
+      sync_status: 'pending',
+      updated_at: new Date().toISOString(),
+    });
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
 // ----------------- Realtime Subscription & 10s Polling Fallback -----------------
 
 export function subscribeToOrders(
@@ -590,6 +664,7 @@ export function subscribeToOrders(
             channel: o.channel as LocalOrder['channel'],
             note: o.note as string | null,
             customer_id: o.customer_id as string | null,
+            assigned_to: (o.assigned_to as string | null) ?? null,
             due_at: o.due_at as string | null,
             version: o.version as number,
             sync_status: 'synced',
@@ -605,6 +680,7 @@ export function subscribeToOrders(
             version: o.version as number,
             order_no: o.order_no as number,
             order_code: o.order_code as string,
+            assigned_to: (o.assigned_to as string | null) ?? undefined,
             updated_at: o.updated_at as string,
             sync_status: 'synced',
           });
@@ -822,6 +898,21 @@ async function sendItem(item: OutboxItem): Promise<OutboxSendResult> {
       if (data && db) {
         await db.repair_jobs.update(payload.p_order as string, {
           waiting_reason: data.waiting_reason,
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'assign_order') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('assign_order', payload);
+      if (error) return { ok: false, code: mapError(error) };
+      if (data && db) {
+        await db.orders.update(data.id, {
+          assigned_to: data.assigned_to,
+          version: data.version,
+          sync_status: 'synced',
+          updated_at: data.updated_at,
         });
       }
       return { ok: true };

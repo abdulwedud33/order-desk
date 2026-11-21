@@ -46,3 +46,31 @@ export function SkeletonRow() {
     </div>
   );
 }
+
+export function SkeletonDeliveryCard() {
+  return (
+    <div className="bg-surface border border-line rounded-card p-4 mb-3 space-y-3.5 shadow-sm">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-6 w-24" />
+        <Skeleton className="h-5 w-20 rounded-full" />
+      </div>
+      <div className="space-y-2 p-3 bg-paper rounded-control border border-line/60">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+        <div className="flex gap-2 pt-1">
+          <Skeleton className="h-8 w-24 rounded-control" />
+          <Skeleton className="h-8 w-24 rounded-control" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Skeleton className="h-3.5 w-5/6" />
+        <Skeleton className="h-3.5 w-2/3" />
+      </div>
+      <div className="flex justify-between items-center pt-2 border-t border-line/60">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-6 w-24 rounded-control" />
+      </div>
+      <Skeleton className="h-14 w-full rounded-control" />
+    </div>
+  );
+}

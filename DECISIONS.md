@@ -153,6 +153,25 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** Order handover via `handover_order` requires both valid pickup code verification AND financial clearance (`total <= paid_amount` or `settle_later = true`). The UI intercepts unpaid handovers with a clear notice directing counter staff to collect payment or record a settle-later agreement first.
    - **Reason:** Enforces invariant 7 and 8 from `docs/05-backend-schema.md`: completed repairs must have a verified handover trail and reconciled balances.
 
+## Milestone M7 Decisions (2026-11-21)
+
+1. **DEC-034: Strict Sanitization & URL-Encoding for Courier Links (`formatTelUri` & `formatMapUri`)**
+   - **Decision:** Dial links are scrubbed and validated against `^\+?[0-9]{7,15}$` before outputting `tel:${cleaned}`. Map URLs strictly percent-encode the address via `https://maps.google.com/?q=${encodeURIComponent(trimmed)}`. Links are never built from raw unescaped model text or unsanitized strings.
+   - **Reason:** Core security requirement from M7 prompt and `docs/security.md` section 11: eliminates any possibility of XSS, `javascript:` pseudo-protocol injection, or URI parameter tampering in customer-facing dialers and navigation links.
+
+2. **DEC-035: Multi-Courier RLS Isolation & Realtime Row Delivery**
+   - **Decision:** `can_see_order` and `can_see_sensitive` restrict courier queries on `orders`, `order_contacts`, `order_money`, and `order_items` strictly to `assigned_to = auth.uid()`. Couriers have zero read access to `order_item_prices` or unassigned orders. Realtime row deliveries strictly follow table RLS.
+   - **Reason:** Non-negotiable Rule 5 and `docs/security.md` section 4: two couriers working a lunch rush cannot see each other's deliveries, customer phone numbers, or addresses.
+
+3. **DEC-036: One Big Primary Action Button Pattern for Courier Ergonomics**
+   - **Decision:** The "My Deliveries" view provides a single high-contrast primary button (56px height, min 48px touch target) per ticket: `Picked Up` (`ready -> out_for_delivery`) and `Delivered` (`out_for_delivery -> completed`), offering immediate optimistic feedback (<100ms) with Dexie outbox queueing.
+   - **Reason:** Designed for couriers on foot or scooter in bright daylight (`docs/04-ui-ux-design-brief.md` and `docs/03-app-flow.md` s3.5), minimizing taps and cognitive overhead.
+
+4. **DEC-037: Integrated Cash-on-Delivery Collection Modal & Ledger Record**
+   - **Decision:** Tapping `Delivered` on an order with an outstanding balance opens `CashCollectedDialog`, prefilled with the exact balance due and guarded against overpayment (`val <= balance`). Confirming queues `record_payment` (`kind: 'payment'`, `method: 'cash'`) and `advance_order` (`completed`) in a single outbox sequence.
+   - **Reason:** Satisfies payment rules (`docs/05-backend-schema.md` rule 2 and `docs/03-app-flow.md` s3.5) ensuring cash in hand immediately reconciles with the append-only ledger without manual counter follow-up.
+
+
 
 
 

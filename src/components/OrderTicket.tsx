@@ -14,6 +14,7 @@ import { PaymentSheet } from './PaymentSheet';
 import { HandoverDialog } from './HandoverDialog';
 import { EstimateApprovalDialog } from './EstimateApprovalDialog';
 import { WaitingReasonDialog } from './WaitingReasonDialog';
+import { AssignCourierDialog } from './AssignCourierDialog';
 import {
   calculateTurnaroundHours,
   formatTurnaroundHours,
@@ -34,6 +35,7 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
   const [isHandoverOpen, setIsHandoverOpen] = useState(false);
   const [isEstimateOpen, setIsEstimateOpen] = useState(false);
   const [isWaitingReasonOpen, setIsWaitingReasonOpen] = useState(false);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [isSettleLater, setIsSettleLater] = useState(order.settle_later ?? false);
 
   const repairJob = useLiveQuery(
@@ -350,6 +352,16 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             )}
 
             <div className="flex items-center gap-2">
+              {!isKitchen && order.type === 'delivery' && (role === 'owner' || role === 'staff') && order.status !== 'completed' && order.status !== 'cancelled' && (
+                <button
+                  type="button"
+                  onClick={() => setIsAssignOpen(true)}
+                  className="h-11 px-3 rounded-control border border-line bg-surface text-xs font-semibold text-ink hover:bg-paper active:scale-95 transition-transform"
+                >
+                  🛵 {order.assigned_to ? t('delivery.assignedTo', { name: 'Courier' }) : t('delivery.assign')}
+                </button>
+              )}
+
               {!isKitchen && money && money.total - money.paid_amount > 0 && (
                 <button
                   type="button"
@@ -420,6 +432,12 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             repairJob={repairJob}
             isOpen={isWaitingReasonOpen}
             onClose={() => setIsWaitingReasonOpen(false)}
+          />
+
+          <AssignCourierDialog
+            order={order}
+            isOpen={isAssignOpen}
+            onClose={() => setIsAssignOpen(false)}
           />
         </>
       )}

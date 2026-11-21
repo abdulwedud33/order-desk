@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useApp } from '../lib/session';
 import { db } from '../lib/db';
@@ -11,8 +12,16 @@ import { OrderTicket } from '../components/OrderTicket';
 import { SkeletonTicket } from '../components/Skeleton';
 
 export default function BoardPage() {
-  const { t, shop, online } = useApp();
+  const { t, shop, online, role } = useApp();
+  const router = useRouter();
   const shopId = shop?.id || '00000000-0000-0000-0000-000000000001';
+
+  // Automatically route courier to dedicated My Deliveries view
+  useEffect(() => {
+    if (role === 'courier') {
+      router.replace('/deliveries');
+    }
+  }, [role, router]);
 
   // Phone tab selection: 'new' | 'in_progress' | 'ready' | 'all'
   const [activeTab, setActiveTab] = useState<'new' | 'in_progress' | 'ready' | 'all'>('new');
