@@ -48,7 +48,7 @@ export function extractAndRedactPhones(text: string): {
   return { redactedText, phones, extractedPhones: phones };
 }
 
-const INJECTION = /(ignore (all |any |the )?(previous|prior|above|your)|disregard (all |any |the )?(prior |previous )?(rules|instructions|directives)|system prompt|reveal (your )?(prompt|instructions)|you are now|act as|override (all |any |the )?(rules|instructions|system)|bypass security|developer message|jailbreak)/i;
+const INJECTION = /(ignore (all |any |the )?(previous|prior|above|your)|disregard (all |any |the )?(prior |previous )?(rules|instructions|directives)|system prompt|reveal (your )?(prompt|instructions)|you are now|act as|override (all |any |the )?(rules|instructions|system)|override.*rules|bypass security|developer message|jailbreak)/i;
 
 /** Only used for metrics and alerts. Detection never gates safety. */
 export function looksLikeInjection(text: string): boolean {

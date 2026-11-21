@@ -233,6 +233,25 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** Implemented `tests/ai/eval_harness.ts` with structured test fixtures across English, Amharic, and Afaan Oromo per `docs/evals.md` covering plain orders, quantities in words and digits, memory nicknames, delivery with phone extraction, and adversarial injections. Per instructions, if no live model API key is set in the environment, the harness halts cleanly with status `STOPPED_AT_HARNESS` and informative diagnostic output.
    - **Reason:** Gates releases across all three languages without regression while respecting user execution environments without active third-party model keys.
 
+## Milestone M11 Decisions (2026-11-21)
+
+1. **DEC-052: Realtime Publication Audit & Sensitive Table Isolation**
+   - **Decision:** Migration `0010_hardening_and_invariants.sql` audited the `supabase_realtime` publication to ensure it publishes only tables that are safe under row-level security: `orders`, `order_items`, `order_money`, and `order_events`. All sensitive tables (`customers`, `order_contacts`, `repair_jobs`, `order_payments`, `shop_memory`, `ai_usage`) are explicitly dropped from publication.
+   - **Reason:** Non-negotiable Rule 1 & Rule 5 (`docs/security.md` s5.10): Realtime must never broadcast customer contacts or payment details to unauthorised subscribers or kitchen displays.
+
+2. **DEC-053: Schema Privilege Lockdown & Column-Level Direct Write Grants**
+   - **Decision:** Revoked all privileges on all schema tables, sequences, and routines from `anon` and `authenticated`. Re-granted `SELECT` strictly on approved tables with RLS policies in place. Column-level `INSERT` and `UPDATE` were granted only on tables where documentation allows direct writes (`profiles`, `catalog_categories`, `catalog_items`, `customers`, `shop_memory`). Executions were granted only on verified user-facing RPC functions.
+   - **Reason:** Satisfies `docs/05-backend-schema.md` section 7 & `docs/security.md` section 5: default deny privilege model.
+
+3. **DEC-054: Nightly Automated Invariants Job (9 Invariants)**
+   - **Decision:** Created database function `public.check_invariants(p_shop_id)` and cron wrapper `public.run_nightly_invariants_job()` in PostgreSQL to verify all 9 domain invariants defined in `docs/05-backend-schema.md` section 10. The job writes an execution summary to table `public.invariant_checks` and logs an alert if any violation is found.
+   - **Reason:** Continuous automated integrity auditing ensuring accounting ledgers, status machines, sequence counters, and RLS policies never drift out of compliance.
+
+4. **DEC-055: Automated Axe Accessibility & Bundle Budget Verification in CI**
+   - **Decision:** Added Playwright test `tests/e2e/accessibility_budgets.spec.ts` using `@axe-core/playwright` across all primary application routes (`/`, `/orders/new`, `/track`, `/reports`, `/memory`, `/kitchen`, `/deliveries`). Configured assertions for 0 critical and 0 serious accessibility violations, and verified bundle budgets (tracking page $\le$ 25 KB gzip, board JS $\le$ 170 KB).
+   - **Reason:** Satisfies `docs/evals.md` section 7 and Definition of Done: accessible, lightweight, high-performance static architecture.
+
+
 
 
 
