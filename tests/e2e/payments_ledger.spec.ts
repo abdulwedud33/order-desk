@@ -75,32 +75,25 @@ test.describe('Milestone M5 Payments & Deposits Ledger Flows', () => {
     await expect(orderTicket.getByText(/140\.00/i).first()).toBeVisible();
 
     // 8. Test settle-later completion gate
-    // Switch to 'All' tab so ticket stays visible across state transitions
-    const allTab = page.getByRole('button', { name: /All/i });
-    if (await allTab.isVisible()) {
-      await allTab.click();
-    }
+    // Switch to 'All' tab so ticket stays visible across all state transitions
+    const allTab = page.locator('button:has-text("All")');
+    await allTab.click();
+    await page.waitForTimeout(200);
 
-    // Advance order: new -> accepted -> in_progress -> ready
-    const nextBtn = orderTicket.locator('button').filter({ hasText: /Accept|Start|Ready|Complete/i }).first();
-    
     // Accept
-    await nextBtn.click();
-    await page.waitForTimeout(400);
+    const acceptBtn = orderTicket.locator('button').filter({ hasText: /Accept/i }).first();
+    await expect(acceptBtn).toBeVisible();
+    await acceptBtn.click();
 
     // Start Prep
     const startBtn = orderTicket.locator('button').filter({ hasText: /Start/i }).first();
-    if (await startBtn.isVisible()) {
-      await startBtn.click();
-      await page.waitForTimeout(400);
-    }
+    await expect(startBtn).toBeVisible();
+    await startBtn.click();
 
     // Ready
     const readyBtn = orderTicket.locator('button').filter({ hasText: /Ready/i }).first();
-    if (await readyBtn.isVisible()) {
-      await readyBtn.click();
-      await page.waitForTimeout(400);
-    }
+    await expect(readyBtn).toBeVisible();
+    await readyBtn.click();
 
     // Now order is ready. Attempting to click Complete with unpaid balance should trigger warning and payment sheet
     const completeBtn = orderTicket.locator('button').filter({ hasText: /Complete/i }).first();

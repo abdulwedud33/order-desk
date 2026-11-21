@@ -18,6 +18,7 @@ export const ERROR_CODES = [
   'UNKNOWN',
   'LIMIT_EXCEEDED',
   'DUPLICATE',
+  'INVALID_CODE',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

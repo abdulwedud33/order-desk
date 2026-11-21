@@ -99,6 +99,24 @@ export interface LocalOrderPayment {
   created_at: string;
 }
 
+export interface LocalRepairJob {
+  order_id: string;
+  shop_id: string;
+  device: string;
+  problem: string;
+  serial?: string | null;
+  approved_total?: number | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  diagnosis?: string | null;
+  pickup_code?: string | null;
+  pickup_code_hash?: string | null;
+  handed_over_at?: string | null;
+  handover_override?: boolean;
+  waiting_reason?: string | null;
+  created_at: string;
+}
+
 export interface MetaRow {
   key: string;
   value: unknown;
@@ -113,6 +131,7 @@ export class OrderDeskDB extends Dexie {
   order_money!: Table<LocalOrderMoney, string>;
   order_contacts!: Table<LocalOrderContact, string>;
   order_payments!: Table<LocalOrderPayment, string>;
+  repair_jobs!: Table<LocalRepairJob, string>;
   outbox!: Table<OutboxItem, string>;
   meta!: Table<MetaRow, string>;
 
@@ -147,6 +166,19 @@ export class OrderDeskDB extends Dexie {
       outbox: 'id, shopId, kind, status, nextAttemptAt, createdAt',
       meta: 'key',
     });
+    this.version(4).stores({
+      categories: 'id, shop_id, sort, name',
+      items: 'id, shop_id, category_id, name, available, updated_at',
+      customers: 'id, shop_id, name, phone, updated_at',
+      orders: 'id, shop_id, order_no, order_code, type, status, sync_status, created_at',
+      order_items: 'id, order_id, shop_id, item_id',
+      order_money: 'order_id, shop_id',
+      order_contacts: 'order_id, shop_id, phone',
+      order_payments: 'id, order_id, shop_id, kind, created_at',
+      repair_jobs: 'order_id, shop_id, device, waiting_reason',
+      outbox: 'id, shopId, kind, status, nextAttemptAt, createdAt',
+      meta: 'key',
+    });
   }
 }
 
@@ -166,6 +198,7 @@ export async function wipeLocalData(): Promise<void> {
     db.order_money.clear(),
     db.order_contacts.clear(),
     db.order_payments.clear(),
+    db.repair_jobs.clear(),
     db.outbox.clear(),
     db.meta.clear(),
   ]);

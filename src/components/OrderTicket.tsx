@@ -1,14 +1,24 @@
 'use client';
 
 import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useApp } from '../lib/session';
 import type { LocalOrder, LocalOrderItem, LocalOrderMoney } from '../lib/db';
+import { db } from '../lib/db';
 import { getAgeTimerInfo } from '../domain/timer';
 import { queueAdvanceOrder } from '../lib/sync';
 import type { OrderStatus } from '../domain/status';
 import type { MessageKey } from '../i18n/en';
 import { BalanceChip } from './BalanceChip';
 import { PaymentSheet } from './PaymentSheet';
+import { HandoverDialog } from './HandoverDialog';
+import { EstimateApprovalDialog } from './EstimateApprovalDialog';
+import { WaitingReasonDialog } from './WaitingReasonDialog';
+import {
+  calculateTurnaroundHours,
+  formatTurnaroundHours,
+  buildStatusNotificationMessage,
+} from '../domain/repair';
 
 interface OrderTicketProps {
   order: LocalOrder;
@@ -18,14 +28,31 @@ interface OrderTicketProps {
 }
 
 export function OrderTicket({ order, items, money, isKitchen = false }: OrderTicketProps) {
-  const { t, shop, role, showToast, errorText } = useApp();
+  const { t, shop, role, showToast, errorText, locale } = useApp();
   const [advancing, setAdvancing] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+  const [isEstimateOpen, setIsEstimateOpen] = useState(false);
+  const [isWaitingReasonOpen, setIsWaitingReasonOpen] = useState(false);
   const [isSettleLater, setIsSettleLater] = useState(order.settle_later ?? false);
+
+  const repairJob = useLiveQuery(
+    () => (db && order.type === 'repair' ? db.repair_jobs.get(order.id) : undefined),
+    [order.id, order.type]
+  );
 
   const timerInfo = getAgeTimerInfo(order.created_at, order.due_at, new Date());
   const isPending = order.sync_status === 'pending';
   const displayCode = order.order_code || order.temp_ref;
+  const isRepair = order.type === 'repair';
+  const total = money?.total ?? 0;
+  const isEstimateExceeded =
+    isRepair &&
+    repairJob?.approved_total != null &&
+    total > repairJob.approved_total;
+
+  const turnaroundHours = calculateTurnaroundHours(order.created_at, order.completed_at);
+  const turnaroundText = formatTurnaroundHours(turnaroundHours);
 
   // Determine single next step action button
   let nextStatus: OrderStatus | null = null;
@@ -40,10 +67,16 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
   } else if (order.status === 'in_progress') {
     nextStatus = 'ready';
     actionKey = 'board.ready';
+  } else if (order.status === 'waiting') {
+    nextStatus = 'in_progress';
+    actionKey = 'board.start';
   } else if (order.status === 'ready') {
     if (order.type === 'delivery') {
       nextStatus = 'out_for_delivery';
       actionKey = 'board.outForDelivery';
+    } else if (isRepair) {
+      nextStatus = 'completed';
+      actionKey = 'repair.verifyAndHandover';
     } else {
       nextStatus = 'completed';
       actionKey = 'board.complete';
@@ -60,11 +93,18 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
   }
 
   const handleNextStep = async () => {
-    if (!nextStatus || advancing) return;
+    if (advancing) return;
+
+    // For repair orders ready to complete, trigger Handover Dialog
+    if (isRepair && order.status === 'ready' && !isKitchen) {
+      setIsHandoverOpen(true);
+      return;
+    }
+
+    if (!nextStatus) return;
 
     // Settle-later rule on completion
     if (nextStatus === 'completed' && !isKitchen) {
-      const total = money?.total ?? 0;
       const paid = money?.paid_amount ?? 0;
       const hasUnpaid = total - paid > 0;
       const effectiveSettleLater = isSettleLater || order.settle_later;
@@ -87,6 +127,21 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
     }
   };
 
+  const handleCopyUpdateMessage = () => {
+    const statusKey = `status.${order.status}` as MessageKey;
+    const statusLabel = t(statusKey) || order.status;
+    const msg = buildStatusNotificationMessage({
+      shopName: shop?.name || 'Order Desk',
+      orderCode: displayCode,
+      statusLabel,
+      locale: locale as 'en' | 'am' | 'om',
+    });
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(msg);
+      showToast(t('repair.updateCopied'));
+    }
+  };
+
   // Border accent color by status
   const statusBorderClass =
     order.status === 'new'
@@ -95,6 +150,8 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
       ? 'border-l-st-progress'
       : order.status === 'ready'
       ? 'border-l-st-ready'
+      : order.status === 'waiting'
+      ? 'border-l-[#6B4BC4]'
       : 'border-l-line';
 
   // Age timer color: Neutral, Amber near due, Red ONLY for late (Von Restorff)
@@ -118,8 +175,22 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
           </div>
         )}
 
+        {/* Estimate Exceeded Banner for Repairs */}
+        {isEstimateExceeded && !isKitchen && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-700 px-3 py-1.5 text-xs font-semibold flex justify-between items-center">
+            <span>⚠️ {t('repair.estimateExceeded')}</span>
+            <button
+              type="button"
+              onClick={() => setIsEstimateOpen(true)}
+              className="underline hover:text-amber-900"
+            >
+              {t('repair.approveEstimate')}
+            </button>
+          </div>
+        )}
+
         <div className="p-3.5 space-y-2.5">
-          {/* Header: Number, Age Timer, Status Chip */}
+          {/* Header: Number, Turnaround/Age, Status Chip */}
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span className="font-heading text-2xl font-bold text-ink num tracking-tight">
@@ -133,12 +204,22 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             </div>
 
             <div className="flex items-center gap-1.5">
+              {/* Turnaround Badge for Repairs */}
+              {isRepair && (
+                <span
+                  className="px-2 py-0.5 rounded text-xs num bg-paper text-slate border border-line/60"
+                  title={t('repair.turnaround')}
+                >
+                  ⏱️ {turnaroundText}
+                </span>
+              )}
+
               {/* Age Timer Chip */}
               <span
                 className={`px-2 py-0.5 rounded text-xs num flex items-center gap-1 ${timerBadgeClass}`}
                 title={`Arrived ${timerInfo.ageMinutes}m ago`}
               >
-                ⏱️ {timerInfo.displayTimer}
+                {timerInfo.displayTimer}
               </span>
 
               {/* Status Chip */}
@@ -150,7 +231,7 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
 
           {/* Sub-header: Type & Table / Label & Balance Chip */}
           <div className="flex items-center justify-between text-xs text-slate">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-ink">
                 {t(`order.${order.type}` as MessageKey) || order.type}
               </span>
@@ -168,6 +249,12 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
                   <span className="num text-slate">{order.customer_phone}</span>
                 </>
               )}
+              {/* Pickup Code Display (Hidden in kitchen mode) */}
+              {!isKitchen && repairJob?.pickup_code && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-tabular bg-ember/10 text-ember border border-ember/20">
+                  Code: {repairJob.pickup_code}
+                </span>
+              )}
             </div>
 
             {/* Balance Chip (hidden in kitchen mode) */}
@@ -181,6 +268,37 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
               />
             )}
           </div>
+
+          {/* Repair Details Box (Device, Problem, Serial, Waiting reason) */}
+          {isRepair && repairJob && (
+            <div className="p-2.5 bg-paper rounded-control border border-line/60 text-xs space-y-1">
+              <div className="flex justify-between items-baseline">
+                <span className="font-bold text-ink">{repairJob.device}</span>
+                {repairJob.serial && (
+                  <span className="text-[10px] text-slate font-tabular">SN: {repairJob.serial}</span>
+                )}
+              </div>
+              <p className="text-slate line-clamp-2">{repairJob.problem}</p>
+
+              {/* Waiting Reason Tag */}
+              {order.status === 'waiting' && (
+                <div className="pt-1 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-[#6B4BC4]">
+                    ⏳ {repairJob.waiting_reason ? t(`repair.${repairJob.waiting_reason}` as MessageKey) || repairJob.waiting_reason : t('repair.waitingReason')}
+                  </span>
+                  {!isKitchen && (
+                    <button
+                      type="button"
+                      onClick={() => setIsWaitingReasonOpen(true)}
+                      className="text-[10px] text-slate hover:text-ink underline"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Items List (Glanceable lines with bold quantities) */}
           <div className="border-t border-line/60 pt-2 space-y-1">
@@ -206,21 +324,33 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             )}
           </div>
 
-          {/* Footer: Money (Hidden in kitchen mode) & Next Action Button */}
+          {/* Footer: Money (Hidden in kitchen mode), Copy update & Action Button */}
           <div className="pt-2 border-t border-line/60 flex items-center justify-between gap-2">
             {!isKitchen ? (
-              <div className="cursor-pointer" onClick={() => setIsPaymentOpen(true)} title={t('pay.title')}>
-                <span className="text-[10px] text-slate block">{t('orders.total')}</span>
-                <span className="font-heading font-bold text-base text-ink num">
-                  {money ? money.total.toFixed(2) : '0.00'} ETB
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="cursor-pointer" onClick={() => setIsPaymentOpen(true)} title={t('pay.title')}>
+                  <span className="text-[10px] text-slate block">{t('orders.total')}</span>
+                  <span className="font-heading font-bold text-base text-ink num">
+                    {money ? money.total.toFixed(2) : '0.00'} ETB
+                  </span>
+                </div>
+                {/* Copy Status Update Message */}
+                <button
+                  type="button"
+                  onClick={handleCopyUpdateMessage}
+                  className="text-[11px] text-slate hover:text-ink p-1 rounded hover:bg-paper"
+                  title={t('repair.copyUpdate')}
+                  aria-label={t('repair.copyUpdate')}
+                >
+                  📋
+                </button>
               </div>
             ) : (
               <div />
             )}
 
             <div className="flex items-center gap-2">
-              {!isKitchen && money && (money.total - money.paid_amount > 0) && (
+              {!isKitchen && money && money.total - money.paid_amount > 0 && (
                 <button
                   type="button"
                   onClick={() => setIsPaymentOpen(true)}
@@ -230,7 +360,7 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
                 </button>
               )}
 
-              {actionKey && nextStatus && (
+              {actionKey && (
                 <button
                   type="button"
                   disabled={advancing}
@@ -249,22 +379,50 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
         </div>
       </article>
 
-      {/* Payment Sheet */}
+      {/* Modals */}
       {!isKitchen && (
-        <PaymentSheet
-          order={order}
-          money={money}
-          isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          userRole={role || 'staff'}
-          currency={shop?.currency || 'ETB'}
-          onSettleLaterChange={(val) => setIsSettleLater(val)}
-          onPaymentRecorded={() => {
-            showToast(t('pay.success'));
-          }}
-        />
+        <>
+          <PaymentSheet
+            order={order}
+            money={money}
+            isOpen={isPaymentOpen}
+            onClose={() => setIsPaymentOpen(false)}
+            userRole={role || 'staff'}
+            currency={shop?.currency || 'ETB'}
+            onSettleLaterChange={(val) => setIsSettleLater(val)}
+            onPaymentRecorded={() => {
+              showToast(t('pay.success'));
+            }}
+          />
+
+          <HandoverDialog
+            order={order}
+            repairJob={repairJob}
+            money={money}
+            isOpen={isHandoverOpen}
+            onClose={() => setIsHandoverOpen(false)}
+            userRole={role || 'staff'}
+            onHandoverComplete={() => {
+              // HandoverDialog already shows toast
+            }}
+          />
+
+          <EstimateApprovalDialog
+            order={order}
+            repairJob={repairJob}
+            currentTotal={total}
+            isOpen={isEstimateOpen}
+            onClose={() => setIsEstimateOpen(false)}
+          />
+
+          <WaitingReasonDialog
+            order={order}
+            repairJob={repairJob}
+            isOpen={isWaitingReasonOpen}
+            onClose={() => setIsWaitingReasonOpen(false)}
+          />
+        </>
       )}
     </>
   );
 }
-

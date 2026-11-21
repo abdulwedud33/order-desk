@@ -131,6 +131,28 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** The `PaymentSheet` automatically prefills the amount with the exact outstanding balance, and preselects the user's last chosen payment method persisted in `localStorage`.
    - **Reason:** UX requirement in `docs/03-app-flow.md` s3.5b and `docs/04-ui-ux-design-brief.md` s8: minimizes cognitive load and counter delay (Hick's Law).
 
+## Milestone M6 Decisions (2026-11-21)
+
+1. **DEC-029: Hash-Only Storage for Repair Pickup Codes (`sha256 bytea`)**
+   - **Decision:** Pickup codes are generated as 4-digit numeric pins on customer intake. Only the cryptographically hashed representation (`sha256(convert_to(upper(trim(code)), 'UTF8'))`) is stored in `public.repair_jobs.pickup_code_hash`. Plaintext codes exist temporarily on client local device memory during intake.
+   - **Reason:** Enforces `docs/security.md` and Non-negotiable Rule 1: device handover requires proof of customer possession; database dumps or leaks never expose cleartext pickup credentials.
+
+2. **DEC-030: Strict Owner-Only Handover Override Policy**
+   - **Decision:** In `handover_order`, setting `p_override = true` is strictly guarded by `v_role = 'owner'` and rejected with `FORBIDDEN` for staff or couriers. Every override event is logged to immutable `order_events` with actor identity and timestamp.
+   - **Reason:** Satisfies `docs/05-backend-schema.md` s6 and `docs/evals.md` s6.1: preventing unauthorized equipment release by staff without customer presence while accommodating legitimate customer loss of code verified directly by the shop owner.
+
+3. **DEC-031: Estimate Threshold Status Invariant (`total > approved_total => waiting`)**
+   - **Decision:** In `edit_order`, whenever item lines on a repair order are modified such that the recalculated total exceeds `approved_total`, the status machine automatically forces order status to `'waiting'` and sets `waiting_reason = 'estimate_exceeded'`. The order cannot progress to `ready` until an updated estimate is formally approved via `approve_estimate`.
+   - **Reason:** Core requirement in `docs/05-backend-schema.md` s6 and user request: customers must never be blindsided by post-intake price escalations without explicit authorization.
+
+4. **DEC-032: Kitchen Privacy Separation via `repair_jobs_kitchen` View**
+   - **Decision:** RLS on `public.repair_jobs` restricts direct `SELECT` to `can_see_sensitive()` (owner, staff, assigned courier). The `kitchen` role accesses `public.repair_jobs_kitchen`, which explicitly omits `pickup_code_hash`, `approved_total`, `approved_by`, `handed_over_at`, and `handover_override`.
+   - **Reason:** Satisfies Non-negotiable Rule 5 and `docs/05-backend-schema.md` matrix: technicians/bench staff see the device and problem description to perform work, with zero access to customer collection codes or financials.
+
+5. **DEC-033: Dual-Gate Handover Verification (Code & Settle-Later)**
+   - **Decision:** Order handover via `handover_order` requires both valid pickup code verification AND financial clearance (`total <= paid_amount` or `settle_later = true`). The UI intercepts unpaid handovers with a clear notice directing counter staff to collect payment or record a settle-later agreement first.
+   - **Reason:** Enforces invariant 7 and 8 from `docs/05-backend-schema.md`: completed repairs must have a verified handover trail and reconciled balances.
+
 
 
 

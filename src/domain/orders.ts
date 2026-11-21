@@ -28,6 +28,12 @@ export interface CreateOrderInput {
   contact?: OrderContactInput;
   deliveryFee?: number;
   customerId?: string;
+  repair?: {
+    device: string;
+    problem: string;
+    serial?: string;
+    pickup_code?: string;
+  };
 }
 
 /** Formats temporary reference displayed while order is offline / pending sync */

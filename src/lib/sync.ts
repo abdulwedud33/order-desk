@@ -234,15 +234,27 @@ export async function queueCreateOrder(input: CreateOrderInput): Promise<LocalOr
       p_contact: input.contact ?? null,
       p_delivery_fee: deliveryFee,
       p_customer: input.customerId ?? null,
+      p_repair: input.repair ?? null,
     },
   });
 
   // Atomic local transaction
-  await db.transaction('rw', [db.orders, db.order_items, db.order_money, db.order_contacts, db.outbox], async () => {
+  await db.transaction('rw', [db.orders, db.order_items, db.order_money, db.order_contacts, db.repair_jobs, db.outbox], async () => {
     await db.orders.put(localOrder);
     await db.order_items.bulkPut(localItems);
     await db.order_money.put(localMoney);
     await db.order_contacts.put(localContact);
+    if (input.type === 'repair' && input.repair) {
+      await db.repair_jobs.put({
+        order_id: input.id,
+        shop_id: input.shopId,
+        device: input.repair.device,
+        problem: input.repair.problem,
+        serial: input.repair.serial ?? null,
+        pickup_code: input.repair.pickup_code ?? null,
+        created_at: nowIso,
+      });
+    }
     await db.outbox.put(outboxItem);
   });
 
@@ -414,6 +426,126 @@ export async function queueSetSettleLater(
       settle_later: settleLater,
       updated_at: new Date().toISOString(),
     });
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+export async function queueApproveEstimate(
+  shopId: string,
+  orderId: string,
+  total: number
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'approve_estimate',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_client_id: clientId,
+      p_total: total,
+    },
+  });
+
+  await db.transaction('rw', [db.repair_jobs, db.orders, db.outbox], async () => {
+    const existing = await db.repair_jobs.get(orderId);
+    if (existing) {
+      await db.repair_jobs.update(orderId, {
+        approved_total: total,
+        approved_at: new Date().toISOString(),
+        waiting_reason: existing.waiting_reason === 'estimate_exceeded' ? null : existing.waiting_reason,
+      });
+    }
+    const order = await db.orders.get(orderId);
+    if (order && order.status === 'waiting') {
+      await db.orders.update(orderId, {
+        status: 'in_progress',
+        updated_at: new Date().toISOString(),
+      });
+    }
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+export async function queueHandoverOrder(
+  shopId: string,
+  orderId: string,
+  code?: string,
+  override: boolean = false
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'handover_order',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_code: code ?? null,
+      p_override: override,
+      p_client_id: clientId,
+    },
+  });
+
+  await db.transaction('rw', [db.orders, db.repair_jobs, db.outbox], async () => {
+    await db.orders.update(orderId, {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    const job = await db.repair_jobs.get(orderId);
+    if (job) {
+      await db.repair_jobs.update(orderId, {
+        handed_over_at: new Date().toISOString(),
+        handover_override: override,
+      });
+    }
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+export async function queueSetWaitingReason(
+  shopId: string,
+  orderId: string,
+  reason: string
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'set_waiting_reason',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_reason: reason,
+      p_client_id: clientId,
+    },
+  });
+
+  await db.transaction('rw', [db.orders, db.repair_jobs, db.outbox], async () => {
+    await db.orders.update(orderId, {
+      status: 'waiting',
+      updated_at: new Date().toISOString(),
+    });
+    const job = await db.repair_jobs.get(orderId);
+    if (job) {
+      await db.repair_jobs.update(orderId, {
+        waiting_reason: reason,
+      });
+    }
     await db.outbox.put(outboxItem);
   });
 
@@ -654,6 +786,47 @@ async function sendItem(item: OutboxItem): Promise<OutboxSendResult> {
       return { ok: true };
     }
 
+    if (item.kind === 'approve_estimate') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('approve_estimate', payload);
+      if (error) return { ok: false, code: mapError(error) };
+      if (data && db) {
+        await db.repair_jobs.update(payload.p_order as string, {
+          approved_total: Number(data.approved_total),
+          approved_at: data.approved_at,
+          waiting_reason: data.waiting_reason,
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'handover_order') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('handover_order', payload);
+      if (error) return { ok: false, code: mapError(error) };
+      if (data && db) {
+        await db.orders.update(data.id, {
+          status: 'completed',
+          completed_at: data.completed_at,
+          version: data.version,
+          updated_at: data.updated_at,
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'set_waiting_reason') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('set_waiting_reason', payload);
+      if (error) return { ok: false, code: mapError(error) };
+      if (data && db) {
+        await db.repair_jobs.update(payload.p_order as string, {
+          waiting_reason: data.waiting_reason,
+        });
+      }
+      return { ok: true };
+    }
+
     return { ok: true };
   } catch (err) {
     return { ok: false, code: mapError(err) };
@@ -670,6 +843,7 @@ function mapError(err: unknown): ErrorCode {
     if (msg.includes('VALIDATION')) return 'VALIDATION';
     if (msg.includes('OVERPAYMENT')) return 'OVERPAYMENT';
     if (msg.includes('INVALID_TRANSITION')) return 'INVALID_TRANSITION';
+    if (msg.includes('INVALID_CODE')) return 'INVALID_CODE';
     if (msg.includes('RATE_LIMITED')) return 'RATE_LIMITED';
   }
   return 'OFFLINE';

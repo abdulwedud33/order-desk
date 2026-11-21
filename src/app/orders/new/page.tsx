@@ -14,6 +14,7 @@ import {
 } from '../../../domain/orders';
 import { searchCustomers } from '../../../domain/search';
 import { SkeletonRow } from '../../../components/Skeleton';
+import { generatePickupCode } from '../../../domain/repair';
 import type { OrderType, OrderChannel } from '../../../domain/status';
 import type { MessageKey } from '../../../i18n/en';
 
@@ -41,6 +42,12 @@ export default function NewOrderPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<LocalCustomer | null>(null);
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+
+  // Repair Intake State (M6)
+  const [device, setDevice] = useState('');
+  const [problem, setProblem] = useState('');
+  const [serial, setSerial] = useState('');
+  const [pickupCode, setPickupCode] = useState(() => generatePickupCode());
 
   // Duplicate warning state
   const [duplicateOrder, setDuplicateOrder] = useState<ExistingOrderSnapshot | null>(null);
@@ -181,6 +188,13 @@ export default function NewOrderPage() {
       return;
     }
 
+    if (orderType === 'repair') {
+      if (!device.trim() || !problem.trim()) {
+        showToast('Device model and problem description are required');
+        return;
+      }
+    }
+
     if (duplicateOrder && !ignoreDuplicate) {
       return; // show banner
     }
@@ -206,6 +220,15 @@ export default function NewOrderPage() {
           : undefined,
         deliveryFee,
         customerId: selectedCustomer?.id,
+        repair:
+          orderType === 'repair'
+            ? {
+                device: device.trim(),
+                problem: problem.trim(),
+                serial: serial.trim() || undefined,
+                pickup_code: pickupCode.trim() || undefined,
+              }
+            : undefined,
       });
 
       showToast(t('orders.createSuccess'));
@@ -253,6 +276,85 @@ export default function NewOrderPage() {
             ))}
           </div>
         </div>
+
+        {/* Repair Intake Card (M6) */}
+        {orderType === 'repair' && (
+          <div className="bg-surface border border-line rounded-card p-4 space-y-3 shadow-xs">
+            <h2 className="text-xs font-bold text-ink uppercase tracking-wider">
+              {t('repair.title')}
+            </h2>
+
+            <div>
+              <label htmlFor="repair-device" className="block text-xs font-medium text-slate mb-1">
+                {t('repair.device')} *
+              </label>
+              <input
+                id="repair-device"
+                type="text"
+                value={device}
+                onChange={(e) => setDevice(e.target.value)}
+                placeholder={t('repair.devicePlaceholder')}
+                className="w-full h-11 px-3 bg-surface border border-line rounded-control text-sm text-ink focus:border-ember focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="repair-problem" className="block text-xs font-medium text-slate mb-1">
+                {t('repair.problem')} *
+              </label>
+              <textarea
+                id="repair-problem"
+                rows={2}
+                value={problem}
+                onChange={(e) => setProblem(e.target.value)}
+                placeholder={t('repair.problemPlaceholder')}
+                className="w-full p-2.5 bg-surface border border-line rounded-control text-sm text-ink focus:border-ember focus:outline-none resize-none"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="repair-serial" className="block text-xs font-medium text-slate mb-1">
+                  {t('repair.serial')}
+                </label>
+                <input
+                  id="repair-serial"
+                  type="text"
+                  value={serial}
+                  onChange={(e) => setSerial(e.target.value)}
+                  placeholder={t('repair.serialPlaceholder')}
+                  className="w-full h-11 px-3 bg-surface border border-line rounded-control text-sm text-ink focus:border-ember focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label htmlFor="repair-code" className="block text-xs font-medium text-slate">
+                    {t('repair.pickupCode')}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setPickupCode(generatePickupCode())}
+                    className="text-[10px] text-ember hover:underline font-medium"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <input
+                  id="repair-code"
+                  type="text"
+                  maxLength={6}
+                  value={pickupCode}
+                  onChange={(e) => setPickupCode(e.target.value)}
+                  className="w-full h-11 px-3 bg-surface border border-line rounded-control text-center text-sm font-bold font-tabular text-ink focus:border-ember focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-slate">{t('repair.pickupCodeDesc')}</p>
+          </div>
+        )}
 
         {/* Table / Label & Channel */}
         <div className="grid grid-cols-2 gap-3">
