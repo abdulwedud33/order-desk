@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import '../styles/globals.css';
+import { AppProvider } from '../lib/session';
+import { OfflineBanner } from '../components/Banner';
+import { ToastContainer } from '../components/Toast';
+import { BottomNav } from '../components/Navigation';
 
 export const metadata: Metadata = {
   title: 'Order Desk',
@@ -19,7 +23,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppProvider>
+          <OfflineBanner />
+          {children}
+          <ToastContainer />
+          <BottomNav />
+        </AppProvider>
+      </body>
     </html>
   );
 }

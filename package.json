@@ -11,6 +11,7 @@
     "lint": "next lint",
     "test": "tsx --test tests/**/*.test.ts",
     "test:db": "supabase test db",
+    "test:e2e": "playwright test",
     "test:node": "node --import ./scripts/ts-resolve.mjs --test tests/**/*.test.ts"
   },
   "dependencies": {

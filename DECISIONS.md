@@ -28,3 +28,22 @@ This document records deliberate deviations from planning documents or specific 
 5. **DEC-005: Strict TypeScript & Test Isolation**
    - **Decision:** Strict TypeScript compiler configuration (`strict: true`, `noImplicitAny: true`, `noUncheckedIndexedAccess: true`). Included `fake-indexeddb` for Dexie domain and outbox unit tests without browser runtime overhead.
    - **Reason:** Domain code in `src/domain/` stays pure with zero framework/browser dependencies, enabling lightning-fast node test execution.
+
+## Milestone M1 Decisions (2026-11-21)
+
+1. **DEC-006: Dynamic Schema Inspection for `create_shop` Catalog Seeding**
+   - **Decision:** `create_shop` checks `to_regclass('public.catalog_categories') is not null` before seeding initial items.
+   - **Reason:** Decouples Migration 0002 from Migration 0003, enabling clean M1 identity and RLS test execution while ensuring that once catalog tables exist in M2, new shops automatically receive their sample catalog by business type.
+
+2. **DEC-007: Comprehensive Error Sanitization with Failure Fuzzing**
+   - **Decision:** All user-facing error strings flow strictly through `translateError` and message catalogs `err.<CODE>`.
+   - **Reason:** Non-negotiable security rule 7 (`docs/security.md` section 8). Proved via automated fuzzing against 100+ raw PostgreSQL exception codes, network errors, and raw JSON payloads that zero SQL fragments, stack traces, or technical error codes reach the UI.
+
+3. **DEC-008: Fixed-Layout Onboarding Geometry Invariants**
+   - **Decision:** Fixed height containers on `#onboarding-fixed-header` (64px) and `#onboarding-fixed-footer` (80px) with reserved error message slots (24px min height).
+   - **Reason:** UX requirement (`docs/04-ui-ux-design-brief.md` s7): no buttons move, jump, or resize between onboarding steps. Verified with Playwright that `x`, `y`, `width`, and `height` coordinates remain 100% identical between steps.
+
+4. **DEC-009: Database CI Strategy**
+   - **Decision:** Prepared pgTAP test suite `supabase/tests/001_identity_and_rls.test.sql` to execute in GitHub Actions via `supabase/setup-cli@v1` and against remote Supabase projects, bypassing local Docker requirement.
+   - **Reason:** Local environment lacks Docker daemon; database tests are enforced in CI before any merge.
+
