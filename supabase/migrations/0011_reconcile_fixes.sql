@@ -298,41 +298,60 @@ create policy order_payments_delete on public.order_payments
 grant select on public.orders, public.order_contacts, public.order_money to anon;
 
 -- 7. Invariant 3 correction
+drop function if exists public.check_invariants(uuid);
+
 create or replace function public.check_invariants(p_shop_id uuid default null)
-returns table(invariant_name text, passed boolean, violated_count bigint, details text)
+returns table (
+  invariant_no int,
+  description text,
+  status text,
+  violations int,
+  details jsonb
+)
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_count bigint;
+  v_v1 int;
+  v_v2 int;
+  v_v3 int;
+  v_v4 int;
+  v_v5 int;
+  v_v6 int;
+  v_v7 int;
+  v_v8 int;
 begin
-  -- Invariant 1: Paid amount matches sum of ledger
-  select count(*) into v_count
+  -- Invariant 1: Every order has exactly one 'created' event
+  select count(*)::int into v_v1
+  from public.orders o
+  where (p_shop_id is null or o.shop_id = p_shop_id)
+    and (select count(*) from public.order_events e where e.order_id = o.id and e.type = 'created') <> 1;
+
+  invariant_no := 1;
+  description := 'Every order has exactly one created event';
+  violations := v_v1;
+  status := case when v_v1 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v1);
+  return next;
+
+  -- Invariant 2: order_money.paid_amount equals payments plus deposits minus refunds
+  select count(*)::int into v_v2
   from public.order_money m
   where (p_shop_id is null or m.shop_id = p_shop_id)
     and m.paid_amount <> coalesce(
-      (
-        select sum(case when kind in ('payment', 'deposit') then amount else -amount end)
-        from public.order_payments p
-        where p.order_id = m.order_id
-      ),
+      (select sum(case when p.kind = 'refund' then -p.amount else p.amount end)
+       from public.order_payments p
+       where p.order_id = m.order_id),
       0
     );
 
-  return query select 'inv1_paid_amount_equals_ledger'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: order_money.paid_amount reconciles with order_payments ledger'
-         else format('Fail: %s orders have corrupted paid_amount', v_count) end;
+  invariant_no := 2;
+  description := 'order_money.paid_amount equals payments plus deposits minus refunds';
+  violations := v_v2;
+  status := case when v_v2 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v2);
+  return next;
 
-  -- Invariant 2: Total never exceeds non-negative balance cap
-  select count(*) into v_count
-  from public.order_money m
-  where (p_shop_id is null or m.shop_id = p_shop_id)
-    and (m.subtotal < 0 or m.total < 0 or m.delivery_fee < 0 or m.paid_amount < 0);
-
-  return query select 'inv2_non_negative_amounts'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all monetary fields are non-negative'
-         else format('Fail: %s orders have negative monetary values', v_count) end;
-
-  -- Invariant 3: Line items sum + delivery fee equals total
-  select count(*) into v_count
+  -- Invariant 3: order_money.total equals sum of line totals plus delivery fee
+  select count(*)::int into v_v3
   from public.order_money m
   where (p_shop_id is null or m.shop_id = p_shop_id)
     and m.total <> coalesce(
@@ -345,78 +364,109 @@ begin
       0
     ) + m.delivery_fee;
 
-  return query select 'inv3_total_equals_lines_plus_fee'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: total matches sum of lines plus delivery fee'
-         else format('Fail: %s orders have mismatched total calculation', v_count) end;
+  invariant_no := 3;
+  description := 'order_money.total equals line items sum plus delivery fee';
+  violations := v_v3;
+  status := case when v_v3 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v3);
+  return next;
 
-  -- Invariant 4: Completed delivery orders have valid assigned courier
-  select count(*) into v_count
+  -- Invariant 4: (shop_id, order_date, order_no) is unique and day numbers have no duplicates
+  select count(*)::int into v_v4
+  from (
+    select o.shop_id, o.order_date, o.order_no, count(*) as cnt
+    from public.orders o
+    where o.order_no is not null and (p_shop_id is null or o.shop_id = p_shop_id)
+    group by o.shop_id, o.order_date, o.order_no
+    having count(*) > 1
+  ) dup;
+
+  invariant_no := 4;
+  description := '(shop_id, order_date, order_no) has zero duplicates';
+  violations := v_v4;
+  status := case when v_v4 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v4);
+  return next;
+
+  -- Invariant 5: Every status in order_events timeline follows a legal transition
+  select count(*)::int into v_v5
+  from public.order_events e
+  join public.orders o on o.id = e.order_id
+  where e.type = 'status_changed'
+    and (p_shop_id is null or e.shop_id = p_shop_id)
+    and not exists (
+      select 1 from public.order_transitions t
+      where t.order_type = o.type
+        and t.from_status = e.from_status
+        and t.to_status = e.to_status
+    );
+
+  invariant_no := 5;
+  description := 'Every status transition followed a legal status path';
+  violations := v_v5;
+  status := case when v_v5 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v5);
+  return next;
+
+  -- Invariant 6: Completed orders have completed_at; cancelled orders have a note/reason in event
+  select count(*)::int into v_v6
   from public.orders o
   where (p_shop_id is null or o.shop_id = p_shop_id)
-    and o.type = 'delivery'
-    and o.status in ('out_for_delivery', 'completed')
-    and o.assigned_to is null;
+    and (
+      (o.status = 'completed' and o.completed_at is null) or
+      (o.status = 'cancelled' and not exists (
+        select 1 from public.order_events e
+        where e.order_id = o.id and e.to_status = 'cancelled' and (e.meta->>'reason') is not null and length(e.meta->>'reason') >= 3
+      ))
+    );
 
-  return query select 'inv4_delivery_assignee_present'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all active/completed deliveries have assigned couriers'
-         else format('Fail: %s deliveries lack assigned courier', v_count) end;
+  invariant_no := 6;
+  description := 'Completed orders have timestamp; cancelled orders have reason';
+  violations := v_v6;
+  status := case when v_v6 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v6);
+  return next;
 
-  -- Invariant 5: Completed repair jobs have handover timestamp
-  select count(*) into v_count
+  -- Invariant 7: Completed orders have zero balance unless settle_later is true
+  select count(*)::int into v_v7
+  from public.orders o
+  join public.order_money m on m.order_id = o.id
+  where (p_shop_id is null or o.shop_id = p_shop_id)
+    and o.status = 'completed'
+    and o.settle_later = false
+    and (m.total - m.paid_amount) > 0;
+
+  invariant_no := 7;
+  description := 'Completed orders have zero balance unless settle_later is true';
+  violations := v_v7;
+  status := case when v_v7 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v7);
+  return next;
+
+  -- Invariant 8: Repair orders in completed status have a handover record
+  select count(*)::int into v_v8
   from public.orders o
   join public.repair_jobs r on r.order_id = o.id
   where (p_shop_id is null or o.shop_id = p_shop_id)
     and o.status = 'completed'
     and r.handed_over_at is null;
 
-  return query select 'inv5_repair_handover_timestamped'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all completed repairs recorded handover'
-         else format('Fail: %s completed repairs lack handover timestamp', v_count) end;
+  invariant_no := 8;
+  description := 'Completed repair orders have handover recorded';
+  violations := v_v8;
+  status := case when v_v8 = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('violations', v_v8);
+  return next;
 
-  -- Invariant 6: Completed orders without settle_later have zero unpaid balance
-  select count(*) into v_count
-  from public.orders o
-  join public.order_money m on m.order_id = o.id
-  where (p_shop_id is null or o.shop_id = p_shop_id)
-    and o.status = 'completed'
-    and not coalesce(o.settle_later, false)
-    and (m.total - m.paid_amount) > 0;
-
-  return query select 'inv6_completed_balance_settled'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: completed orders are fully paid unless settle_later flagged'
-         else format('Fail: %s completed orders have unpaid balance without settle_later', v_count) end;
-
-  -- Invariant 7: All repair orders have corresponding repair_jobs row
-  select count(*) into v_count
-  from public.orders o
-  left join public.repair_jobs r on r.order_id = o.id
-  where (p_shop_id is null or o.shop_id = p_shop_id)
-    and o.type = 'repair'
-    and r.id is null;
-
-  return query select 'inv7_repair_jobs_integrity'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all repair orders have repair_jobs records'
-         else format('Fail: %s repair orders missing repair_jobs entry', v_count) end;
-
-  -- Invariant 8: All orders have order_money row
-  select count(*) into v_count
-  from public.orders o
-  left join public.order_money m on m.order_id = o.id
-  where (p_shop_id is null or o.shop_id = p_shop_id)
-    and m.id is null;
-
-  return query select 'inv8_order_money_integrity'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all orders have order_money rows'
-         else format('Fail: %s orders missing order_money row', v_count) end;
-
-  -- Invariant 9: No order_item_prices without corresponding order_items
-  select count(*) into v_count
-  from public.order_item_prices p
-  left join public.order_items i on i.id = p.order_item_id
-  where (p_shop_id is null or p.shop_id = p_shop_id)
-    and i.id is null;
-
-  return query select 'inv9_prices_integrity'::text, (v_count = 0), v_count,
-    case when v_count = 0 then 'Pass: all item prices point to valid item lines'
-         else format('Fail: %s orphan price entries exist', v_count) end;
+  -- Invariant 9: RLS matrix integrity: all 18 tables have row security enabled
+  invariant_no := 9;
+  description := 'All public tables have Row Level Security enabled';
+  select count(*)::int into violations
+  from pg_tables pt
+  where pt.schemaname = 'public'
+    and not pt.rowsecurity
+    and pt.tablename not in ('schema_migrations', 'invariant_checks');
+  status := case when violations = 0 then 'PASS' else 'FAIL' end;
+  details := jsonb_build_object('tables_without_rls', violations);
+  return next;
 end $$;
