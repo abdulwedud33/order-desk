@@ -117,6 +117,23 @@ export const om: Record<MessageKey, string> = {
   'orders.noOrders': 'Hamma ammaatti ajajni hin jiru.',
   'orders.reference': 'Mallattoo',
 
+  // Board & Kitchen (M4)
+  'board.newTab': 'Haaraa',
+  'board.progressTab': 'Hojjetamaa jira',
+  'board.readyTab': 'Qophaa’eera',
+  'board.allTab': 'Hunda',
+  'board.accept': 'Fudhadhu',
+  'board.start': 'Jalqabi',
+  'board.ready': 'Qopheessi',
+  'board.complete': 'Xumuri',
+  'board.outForDelivery': 'Geessuuf baasi',
+  'board.delivered': 'Gaheera',
+  'board.late': 'Turreera',
+  'kitchen.title': 'Iskiriinii Kushiinaa',
+  'kitchen.mute': 'Sagalee Cufi',
+  'kitchen.unmute': 'Sagalee Bani',
+  'kitchen.noOrders': 'Kushiinaa keessa ajajni hin jiru.',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'Tarkaanfii kana raawwachuuf hayyama hin qabdani.',
   'err.NOT_FOUND': 'Galmeen barbaaddan hin argamne.',

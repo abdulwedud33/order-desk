@@ -87,5 +87,28 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** `findDuplicateOrder` compares normalized digits of the customer phone and matching sets of item IDs/names created within 600,000 ms (10 minutes). If detected, an amber warning banner prompts staff with "Create Anyway" or "View Existing".
    - **Reason:** Implements FR-O7 to prevent accidental double-entry from phone calls and chats while permitting intentional duplicate orders when confirmed.
 
+## Milestone M4 Decisions (2026-11-21)
+
+1. **DEC-019: Status Mutation Lock via `orders_guard` & Append-Only `order_events`**
+   - **Decision:** Created database trigger `orders_guard` on `public.orders` that raises an exception if `status`, `paid_amount`, `order_no`, `order_code`, or `shop_id` are modified outside trusted security-definer RPCs (`pg_trigger_depth() > 1` or explicit session context). Status transitions are executed only through `advance_order`, `assign_order`, and `cancel_order`, logging immutable audit records to `public.order_events`.
+   - **Reason:** Strictly enforces Non-negotiable Rule 3 and `docs/05-backend-schema.md`: the database is the judge of state transitions. Direct updates to order states are forbidden.
+
+2. **DEC-020: Age Timer Color Semantics & Von Restorff Principle**
+   - **Decision:** Ticket age timers display elapsed/remaining time using neutral muted styling (`text-muted`) during normal duration, switching to warm amber (`text-amber-500`) when approaching promised time ($\le 5\text{m}$ or $\ge 80\%$ duration), and switching to assertive red (`text-red-500 font-bold`) strictly when an order has breached its promised time (`now > due_at`), displaying a `+Xm late` badge.
+   - **Reason:** Conforms to `DESIGN.md:96` and Von Restorff law: red is strictly reserved across the entire app for lateness and errors so urgent exceptions stand out immediately on busy kitchen and counter screens.
+
+3. **DEC-021: Single Primary Action Pattern per Order State**
+   - **Decision:** Every order card on the board surfaces a single primary next-step button determined by `NEXT_ACTION_BY_STATUS` (e.g., `new -> Accept`, `accepted -> Start Prep`, `in_progress -> Ready`, `ready -> Deliver/Complete`, `out_for_delivery -> Complete`). Secondary actions (e.g. Cancel) require secondary disclosure.
+   - **Reason:** Satisfies Hick's Law and `docs/04-ui-ux-design-brief.md`: staff under pressure have zero cognitive friction choosing what action to perform next.
+
+4. **DEC-022: Multi-Modal Audio/Vibration New Order Notifications with Sound Preference**
+   - **Decision:** Added a Web Audio API synthesized harmonic chime (523.25 Hz C5 + 659.25 Hz E5) paired with Web Vibration API patterns (`[100, 50, 100]`), persisted with a persistent mute toggle in `localStorage`.
+   - **Reason:** Ensures kitchen staff receive clear sensory cues in noisy prep environments while respecting user control over sound output.
+
+5. **DEC-023: Calm Conflict Toast Reconciliation on Concurrent Edits**
+   - **Decision:** When advancing an order fails due to an outdated expected status (`ORDER_CONFLICT_FROM`), the sync layer catches the error, updates local Dexie cache with the server's state, and presents a non-alarmist calm toast (`"Order has already been updated to <status>"`) without blocking further user actions.
+   - **Reason:** Satisfies Non-negotiable Rule 7 and `docs/03-app-flow.md`: calm conflict handling informs staff without raw error banners or loss of unsaved local work.
+
+
 
 

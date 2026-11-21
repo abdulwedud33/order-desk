@@ -46,6 +46,10 @@ export interface LocalOrder {
   customer_phone?: string | null;
   assigned_to?: string | null;
   due_at?: string | null;
+  accepted_at?: string | null;
+  ready_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
   settle_later?: boolean;
   version: number;
   sync_status: 'pending' | 'syncing' | 'synced';

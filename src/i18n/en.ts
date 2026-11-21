@@ -115,6 +115,23 @@ export const en = {
   'orders.noOrders': 'No orders yet.',
   'orders.reference': 'Ref',
 
+  // Board & Kitchen (M4)
+  'board.newTab': 'New',
+  'board.progressTab': 'In Progress',
+  'board.readyTab': 'Ready',
+  'board.allTab': 'All',
+  'board.accept': 'Accept',
+  'board.start': 'Start',
+  'board.ready': 'Ready',
+  'board.complete': 'Complete',
+  'board.outForDelivery': 'Out for Delivery',
+  'board.delivered': 'Delivered',
+  'board.late': 'Late',
+  'kitchen.title': 'Kitchen Display',
+  'kitchen.mute': 'Mute Sound',
+  'kitchen.unmute': 'Unmute Sound',
+  'kitchen.noOrders': 'No orders in the kitchen.',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'You do not have permission to perform this action.',
   'err.NOT_FOUND': 'The requested record could not be found.',

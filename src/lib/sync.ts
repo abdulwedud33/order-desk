@@ -278,6 +278,112 @@ export async function queueEditOrder(
   kickSync(shopId);
 }
 
+export async function queueAdvanceOrder(
+  shopId: string,
+  orderId: string,
+  toStatus: LocalOrder['status'],
+  expectedFrom: LocalOrder['status']
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'advance_order',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_to: toStatus,
+      p_expected_from: expectedFrom,
+      p_client_id: clientId,
+    },
+  });
+
+  await db.transaction('rw', [db.orders, db.outbox], async () => {
+    await db.orders.update(orderId, {
+      status: toStatus,
+      sync_status: 'pending',
+      updated_at: new Date().toISOString(),
+    });
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+// ----------------- Realtime Subscription & 10s Polling Fallback -----------------
+
+export function subscribeToOrders(
+  shopId: string,
+  onNewOrder?: () => void
+): () => void {
+  if (!db || typeof window === 'undefined') {
+    return () => {};
+  }
+
+  // 1. Supabase Realtime channel
+  const channel = supabase
+    .channel(`shop-orders-${shopId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `shop_id=eq.${shopId}`,
+      },
+      async (payload) => {
+        if (!db) return;
+        if (payload.eventType === 'INSERT') {
+          const o = payload.new as Record<string, unknown>;
+          const localOrd: LocalOrder = {
+            id: o.id as string,
+            shop_id: o.shop_id as string,
+            order_date: o.order_date as string,
+            order_no: o.order_no as number,
+            order_code: o.order_code as string,
+            temp_ref: (o.order_code as string) || formatTemporaryReference(o.id as string),
+            type: o.type as LocalOrder['type'],
+            status: o.status as LocalOrder['status'],
+            label: o.label as string | null,
+            channel: o.channel as LocalOrder['channel'],
+            note: o.note as string | null,
+            customer_id: o.customer_id as string | null,
+            due_at: o.due_at as string | null,
+            version: o.version as number,
+            sync_status: 'synced',
+            created_at: o.created_at as string,
+            updated_at: o.updated_at as string,
+          };
+          await db.orders.put(localOrd);
+          if (onNewOrder) onNewOrder();
+        } else if (payload.eventType === 'UPDATE') {
+          const o = payload.new as Record<string, unknown>;
+          await db.orders.update(o.id as string, {
+            status: o.status as LocalOrder['status'],
+            version: o.version as number,
+            order_no: o.order_no as number,
+            order_code: o.order_code as string,
+            updated_at: o.updated_at as string,
+            sync_status: 'synced',
+          });
+        }
+      }
+    )
+    .subscribe();
+
+  // 2. 10-second polling fallback per technical requirements
+  const intervalId = setInterval(() => {
+    pullRecentOrders(shopId).catch(() => {});
+  }, 10_000);
+
+  return () => {
+    channel.unsubscribe();
+    clearInterval(intervalId);
+  };
+}
+
 // ----------------- Sync Processor -----------------
 
 let isProcessing = false;
@@ -362,6 +468,45 @@ async function sendItem(item: OutboxItem): Promise<OutboxSendResult> {
           version: data.version,
           sync_status: 'synced',
           updated_at: data.updated_at,
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'advance_order') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('advance_order', payload);
+
+      if (error) {
+        const code = mapError(error);
+        if (code === 'CONFLICT' && db) {
+          // Reconcile on conflict: fetch latest order state from server
+          const { data: latest } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', payload.p_order as string)
+            .single();
+          if (latest) {
+            await db.orders.update(latest.id, {
+              status: latest.status,
+              version: latest.version,
+              updated_at: latest.updated_at,
+              sync_status: 'synced',
+            });
+          }
+        }
+        return { ok: false, code };
+      }
+
+      if (data && db) {
+        await db.orders.update(data.id, {
+          status: data.status,
+          version: data.version,
+          sync_status: 'synced',
+          updated_at: data.updated_at,
+          accepted_at: data.accepted_at,
+          ready_at: data.ready_at,
+          completed_at: data.completed_at,
         });
       }
       return { ok: true };

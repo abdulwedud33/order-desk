@@ -117,6 +117,23 @@ export const am: Record<MessageKey, string> = {
   'orders.noOrders': 'ምንም ትዕዛዝ የለም።',
   'orders.reference': 'መለያ',
 
+  // Board & Kitchen (M4)
+  'board.newTab': 'አዲስ',
+  'board.progressTab': 'በመስራት ላይ',
+  'board.readyTab': 'ዝግጁ',
+  'board.allTab': 'ሁሉም',
+  'board.accept': 'ተቀበል',
+  'board.start': 'ጀምር',
+  'board.ready': 'ዝግጁ አድርግ',
+  'board.complete': 'አጠናቅ',
+  'board.outForDelivery': 'ለመላክ አውጣ',
+  'board.delivered': 'ደርሷል',
+  'board.late': 'ዘግይቷል',
+  'kitchen.title': 'የማብሰያ ስክሪን',
+  'kitchen.mute': 'ድምጽ አጥፋ',
+  'kitchen.unmute': 'ድምጽ አብራ',
+  'kitchen.noOrders': 'በማብሰያ ክፍል ውስጥ ምንም ትዕዛዝ የለም።',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'ይህን እርምጃ ለመፈፀም ፈቃድ የለዎትም።',
   'err.NOT_FOUND': 'የተጠየቀው መረጃ አልተገኘም።',
