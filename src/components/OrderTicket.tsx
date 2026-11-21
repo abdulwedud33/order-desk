@@ -43,6 +43,35 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
     [order.id, order.type]
   );
 
+  const contact = useLiveQuery(
+    () => (db && !isKitchen ? db.order_contacts.get(order.id) : undefined),
+    [order.id, isKitchen]
+  );
+
+  const handleShareTracking = async () => {
+    const token = contact?.tracking_token || order.id.slice(0, 22);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/track/?token=${encodeURIComponent(token)}`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Order ${displayCode}`,
+          text: `Track your order from ${shop?.name || 'Order Desk'}:`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // User cancelled or clipboard fallback
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast(t('tracking.linkCopied'));
+    }
+  };
+
   const timerInfo = getAgeTimerInfo(order.created_at, order.due_at, new Date());
   const isPending = order.sync_status === 'pending';
   const displayCode = order.order_code || order.temp_ref;
@@ -352,6 +381,17 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             )}
 
             <div className="flex items-center gap-2">
+              {!isKitchen && (
+                <button
+                  type="button"
+                  onClick={handleShareTracking}
+                  className="h-11 px-3 rounded-control border border-line bg-surface text-xs font-semibold text-ink hover:bg-paper active:scale-95 transition-transform"
+                  title={t('tracking.shareLink')}
+                >
+                  🔗 {t('tracking.shareLink')}
+                </button>
+              )}
+
               {!isKitchen && order.type === 'delivery' && (role === 'owner' || role === 'staff') && order.status !== 'completed' && order.status !== 'cancelled' && (
                 <button
                   type="button"

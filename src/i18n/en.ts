@@ -239,6 +239,29 @@ export const en = {
   'delivery.assignSuccess': 'Courier assigned successfully',
   'delivery.deliverySuccess': 'Delivery completed successfully',
   'delivery.pickedUpSuccess': 'Order marked as picked up',
+
+  // Customer Tracking Page (M8)
+  'tracking.title': 'Order Tracking',
+  'tracking.orderStatus': 'Order Status',
+  'tracking.promisedTime': 'Estimated Time',
+  'tracking.lastUpdated': 'Last updated',
+  'tracking.notFound': 'We couldn\'t find this order.',
+  'tracking.notFoundDesc': 'The link may be invalid, expired, or the order may have been completed more than 60 days ago.',
+  'tracking.rateLimited': 'Too many requests. Please wait a moment and refresh.',
+  'tracking.offline': 'You\'re offline. Showing the last update.',
+  'tracking.autoRefresh': 'Auto-refreshes every 20 seconds',
+  'tracking.shareLink': 'Share Tracking',
+  'tracking.copyLink': 'Copy Tracking Link',
+  'tracking.linkCopied': 'Tracking link copied to clipboard',
+  'tracking.stepper.received': 'Received',
+  'tracking.stepper.preparing': 'Preparing',
+  'tracking.stepper.ready': 'Ready',
+  'tracking.stepper.outForDelivery': 'On the Way',
+  'tracking.stepper.delivered': 'Delivered',
+  'tracking.stepper.completed': 'Completed',
+  'tracking.stepper.diagnosing': 'Diagnosing',
+  'tracking.stepper.readyForPickup': 'Ready for Pickup',
+  'tracking.stepper.collected': 'Collected',
 };
 
 export type MessageKey = keyof typeof en;

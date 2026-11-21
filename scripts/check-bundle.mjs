@@ -1,11 +1,16 @@
-// Fails the build if anything that looks like a secret ships in the static output (docs/security.md section 3).
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// Fails the build if anything that looks like a secret ships in the static output (docs/security.md section 3)
+// and enforces bundle-size budgets (docs/02-technical-requirements.md section 6).
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
-const walk = (dir) => readdirSync(dir).flatMap((f) => {
-  const p = join(dir, f);
-  return statSync(p).isDirectory() ? walk(p) : [p];
-});
+const walk = (dir) => {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap((f) => {
+    const p = join(dir, f);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
+};
 
 const problems = [];
 for (const file of walk('out').filter((f) => /\.(js|html|json|map|txt|css|webmanifest)$/.test(f))) {
@@ -21,8 +26,38 @@ for (const file of walk('out').filter((f) => /\.(js|html|json|map|txt|css|webman
   }
 }
 
+// Milestone M8: Bundle size budget check for tracking page (<= 25 KB gzip)
+const trackChunks = walk('out/_next/static/chunks/app/track').filter((f) => f.endsWith('.js'));
+let totalTrackGzipBytes = 0;
+for (const chunk of trackChunks) {
+  const content = readFileSync(chunk);
+  const gz = gzipSync(content);
+  totalTrackGzipBytes += gz.length;
+}
+
+const MAX_TRACK_GZIP_BYTES = 25 * 1024; // 25 KB
+console.log(`Tracking route JS size (gzip): ${totalTrackGzipBytes} bytes (budget: ${MAX_TRACK_GZIP_BYTES} bytes)`);
+
+if (totalTrackGzipBytes > MAX_TRACK_GZIP_BYTES) {
+  problems.push(`Tracking page JS exceeds 25 KB gzip budget: ${totalTrackGzipBytes} bytes > ${MAX_TRACK_GZIP_BYTES} bytes`);
+}
+
+// Tracking page HTML verification: no third-party scripts, noindex, no-referrer
+if (existsSync('out/track/index.html')) {
+  const trackHtml = readFileSync('out/track/index.html', 'utf8');
+  if (/src=["']https?:\/\//.test(trackHtml)) {
+    problems.push('Tracking page contains third-party script references');
+  }
+  if (!/noindex/.test(trackHtml)) {
+    problems.push('Tracking page missing noindex robots meta tag');
+  }
+  if (!/no-referrer/.test(trackHtml)) {
+    problems.push('Tracking page missing no-referrer meta tag');
+  }
+}
+
 if (problems.length) {
-  console.error('Secret scan failed:\n' + problems.join('\n'));
+  console.error('Security/Budget scan failed:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('Bundle secret scan passed.');
+console.log('Bundle secret and budget scan passed.');

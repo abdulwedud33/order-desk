@@ -171,6 +171,25 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** Tapping `Delivered` on an order with an outstanding balance opens `CashCollectedDialog`, prefilled with the exact balance due and guarded against overpayment (`val <= balance`). Confirming queues `record_payment` (`kind: 'payment'`, `method: 'cash'`) and `advance_order` (`completed`) in a single outbox sequence.
    - **Reason:** Satisfies payment rules (`docs/05-backend-schema.md` rule 2 and `docs/03-app-flow.md` s3.5) ensuring cash in hand immediately reconciles with the append-only ledger without manual counter follow-up.
 
+## Milestone M8 Decisions (2026-11-21)
+
+1. **DEC-038: Service-Role Isolation & Minimalist Public Tracking Payload (`track-order`)**
+   - **Decision:** The Edge Function `track-order` is the only external endpoint authorized to look up tokens via the service role client. The public tracking response is strictly scrubbed of all identifying attributes, exposing solely: `shop_name`, `business_type`, `order_code`, `order_type`, `status`, `due_at`, and `updated_at`.
+   - **Reason:** Enforces Non-negotiable Rule 1 and `docs/security.md` section 9: zero customer phone numbers, addresses, personal names, items, or financial numbers ever leave the server for public tracking.
+
+2. **DEC-039: Token Retention & Automatic Expiry Invariants (30d Cancelled / 60d Completed)**
+   - **Decision:** Tokens automatically expire 30 days following cancellation or 60 days following order completion (`docs/05-backend-schema.md` section 11). Expired tokens return the exact same generic payload as non-existent tokens with timing equalisation.
+   - **Reason:** Minimises tracking link longevity and eliminates user/order enumeration vectors.
+
+3. **DEC-040: Layered Sliding-Window Rate Limiting (30/min IP, 10/min Token)**
+   - **Decision:** `track-order` enforces sliding-window rate limits (30 requests/minute per client IP and 10 requests/minute per token), returning HTTP 429 with standard `Retry-After` headers and localized calm messages.
+   - **Reason:** Mitigates automated scraping, token brute-forcing, and DDoS attacks on public endpoints (`docs/security.md` section 7).
+
+4. **DEC-041: Tiny Static Tracking Bundle Budget (<= 25 KB Gzip) & Zero Third-Party Scripts**
+   - **Decision:** The tracking route is prerendered to static HTML and lightweight chunks with no third-party libraries, tracking pixels, or analytics. Automated bundle analysis in CI verifies gzipped JS is strictly under the 25 KB budget with `noindex` and `no-referrer` tags.
+   - **Reason:** Guarantees sub-3-second load times on slow mobile 3G networks in Ethiopia (`docs/02-technical-requirements.md` section 6).
+
+
 
 
 
