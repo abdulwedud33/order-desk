@@ -54,6 +54,27 @@ export const en = {
   'join.submit': 'Join Shop',
   'join.success': 'You have successfully joined {shopName}.',
 
+  // Catalog
+  'catalog.title': 'Menu & Services',
+  'catalog.addItem': 'Add Item',
+  'catalog.name': 'Item or Service Name',
+  'catalog.price': 'Price (ETB)',
+  'catalog.category': 'Category',
+  'catalog.available': 'Available',
+  'catalog.unavailable': "Unavailable (86'd)",
+  'catalog.allCategories': 'All Items',
+  'catalog.empty': 'No items found. Add your first item above.',
+
+  // Customers
+  'customers.title': 'Customers',
+  'customers.searchPlaceholder': 'Search by phone or name...',
+  'customers.searchPrompt': 'Type at least 2 characters to search',
+  'customers.addCustomer': 'Add Customer',
+  'customers.name': 'Full Name',
+  'customers.phone': 'Phone Number',
+  'customers.note': 'Customer Notes / Address',
+  'customers.empty': 'No customers found.',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'You do not have permission to perform this action.',
   'err.NOT_FOUND': 'The requested record could not be found.',

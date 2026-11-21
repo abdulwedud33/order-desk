@@ -56,6 +56,27 @@ export const om: Record<MessageKey, string> = {
   'join.submit': 'Suuqii Makamaa',
   'join.success': '{shopName} milkaa\'inaan makamtaniittu.',
 
+  // Catalog
+  'catalog.title': 'Meenuu & Tajaajiloota',
+  'catalog.addItem': 'Meeshaa Dabalata',
+  'catalog.name': 'Maqaa Meeshaa ykn Tajaajilaa',
+  'catalog.price': 'Gatii (ETB)',
+  'catalog.category': 'Garee',
+  'catalog.available': 'Ni Jira',
+  'catalog.unavailable': 'Dhumateera',
+  'catalog.allCategories': 'Meeshaalee Hunda',
+  'catalog.empty': 'Meeshaan hin argamne. Meeshaa haaraa dabalaa.',
+
+  // Customers
+  'customers.title': 'Maamiltoota',
+  'customers.searchPlaceholder': 'Lakk. bilbilaa ykn maqaan barbaadaa...',
+  'customers.searchPrompt': 'Barbaaduuf yoo xiqqaate qubee 2 galchaa',
+  'customers.addCustomer': 'Maamila Galmeessaa',
+  'customers.name': 'Maqaa Guutuu',
+  'customers.phone': 'Lakkoofsa Bilbilaa',
+  'customers.note': 'Yaadannoo / Teessoo',
+  'customers.empty': 'Maamiltootni hin argamne.',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'Tarkaanfii kana raawwachuuf hayyama hin qabdani.',
   'err.NOT_FOUND': 'Galmeen barbaaddan hin argamne.',

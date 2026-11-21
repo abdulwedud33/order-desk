@@ -47,3 +47,22 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** Prepared pgTAP test suite `supabase/tests/001_identity_and_rls.test.sql` to execute in GitHub Actions via `supabase/setup-cli@v1` and against remote Supabase projects, bypassing local Docker requirement.
    - **Reason:** Local environment lacks Docker daemon; database tests are enforced in CI before any merge.
 
+## Milestone M2 Decisions (2026-11-21)
+
+1. **DEC-010: Direct Table Writes Permitted Only by Owner/Staff with Column Grants**
+   - **Decision:** As specified in `docs/05-backend-schema.md` and Milestone M2 instructions, direct writes are allowed on `catalog_categories` (owner only), `catalog_items` (owner only), and `customers` (owner and staff only) with explicit column grants (`INSERT/UPDATE` granted only on non-system columns like `name, price, available`, excluding `id, shop_id, created_at`).
+   - **Reason:** Keeps simple CRUD straightforward while strictly denying kitchen and courier roles any read or write access on `customers` or modifying menu catalog items.
+
+2. **DEC-011: Customer Personal Data Isolation (Phone & Sensitive Attributes)**
+   - **Decision:** The `customers` table is locked down under RLS with `has_role(shop_id, 'staff')`. Kitchen and courier members have zero SELECT/INSERT/UPDATE/DELETE privileges on `customers`. In the client UI, kitchen and courier views display an explicit forbidden state if directly accessed.
+   - **Reason:** Enforces Non-negotiable Rule 5 and `docs/security.md` section 4: customer contacts and phone numbers are sensitive personal data and must never be exposed to kitchen or courier roles.
+
+3. **DEC-012: Search Suggestion 2-Character Rule & Ranking**
+   - **Decision:** Customer search queries below 2 characters do not trigger filtering or substring queries; instead, recent customers are displayed. Queries of 2+ characters trigger normalized prefix-first matching, ranking exact name/phone prefix matches ahead of substring matches.
+   - **Reason:** Satisfies FR-CU2 and UX responsiveness guidelines in `docs/04-ui-ux-design-brief.md` while preventing excessive UI re-renders on single-character inputs.
+
+4. **DEC-013: Incremental Sync with 50-Row Pagination**
+   - **Decision:** Sync engine in `src/lib/sync.ts` pages PostgREST fetches in batches of 50 (`.range(from, from + 49)`) using the `updated_at` watermark.
+   - **Reason:** Prevents PostgREST `max_rows` truncation issues and ensures smooth offline hydration into local Dexie IndexedDB.
+
+

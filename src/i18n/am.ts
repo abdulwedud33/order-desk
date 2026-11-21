@@ -56,6 +56,27 @@ export const am: Record<MessageKey, string> = {
   'join.submit': 'ሱቁን ተቀላቀል',
   'join.success': '{shopName} በተሳካ ሁኔታ ተቀላቅለዋል።',
 
+  // Catalog
+  'catalog.title': 'ሜኑ እና እቃዎች',
+  'catalog.addItem': 'አዲስ እቃ ጨምር',
+  'catalog.name': 'የእቃው ወይም የአገልግሎቱ ስም',
+  'catalog.price': 'ዋጋ (ብር)',
+  'catalog.category': 'ምድብ',
+  'catalog.available': 'አለ',
+  'catalog.unavailable': 'አልቋል',
+  'catalog.allCategories': 'ሁሉም እቃዎች',
+  'catalog.empty': 'ምንም እቃዎች አልተገኙም። ከላይ አዲስ እቃ ይጨምሩ።',
+
+  // Customers
+  'customers.title': 'ደንበኞች',
+  'customers.searchPlaceholder': 'በስልክ ወይም በስም ፈልግ...',
+  'customers.searchPrompt': 'ለመፈለግ ቢያንስ 2 ፊደላትን ያስገቡ',
+  'customers.addCustomer': 'ደንበኛ መዝግብ',
+  'customers.name': 'ሙሉ ስም',
+  'customers.phone': 'ስልክ ቁጥር',
+  'customers.note': 'ማስታወሻ / አድራሻ',
+  'customers.empty': 'ምንም ደንበኞች አልተገኙም።',
+
   // Errors: never expose codes, SQL, stack traces, or technical jargon
   'err.FORBIDDEN': 'ይህን እርምጃ ለመፈፀም ፈቃድ የለዎትም።',
   'err.NOT_FOUND': 'የተጠየቀው መረጃ አልተገኘም።',
