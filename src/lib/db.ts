@@ -86,6 +86,19 @@ export interface LocalOrderContact {
   tracking_token?: string | null;
 }
 
+export interface LocalOrderPayment {
+  id: string;
+  order_id: string;
+  shop_id: string;
+  kind: 'payment' | 'deposit' | 'refund';
+  amount: number;
+  method: 'cash' | 'mobile_money' | 'bank' | 'other';
+  note?: string | null;
+  client_id?: string | null;
+  created_by?: string | null;
+  created_at: string;
+}
+
 export interface MetaRow {
   key: string;
   value: unknown;
@@ -99,6 +112,7 @@ export class OrderDeskDB extends Dexie {
   order_items!: Table<LocalOrderItem, string>;
   order_money!: Table<LocalOrderMoney, string>;
   order_contacts!: Table<LocalOrderContact, string>;
+  order_payments!: Table<LocalOrderPayment, string>;
   outbox!: Table<OutboxItem, string>;
   meta!: Table<MetaRow, string>;
 
@@ -121,6 +135,18 @@ export class OrderDeskDB extends Dexie {
       outbox: 'id, shopId, kind, status, nextAttemptAt, createdAt',
       meta: 'key',
     });
+    this.version(3).stores({
+      categories: 'id, shop_id, sort, name',
+      items: 'id, shop_id, category_id, name, available, updated_at',
+      customers: 'id, shop_id, name, phone, updated_at',
+      orders: 'id, shop_id, order_no, order_code, type, status, sync_status, created_at',
+      order_items: 'id, order_id, shop_id, item_id',
+      order_money: 'order_id, shop_id',
+      order_contacts: 'order_id, shop_id, phone',
+      order_payments: 'id, order_id, shop_id, kind, created_at',
+      outbox: 'id, shopId, kind, status, nextAttemptAt, createdAt',
+      meta: 'key',
+    });
   }
 }
 
@@ -139,6 +165,7 @@ export async function wipeLocalData(): Promise<void> {
     db.order_items.clear(),
     db.order_money.clear(),
     db.order_contacts.clear(),
+    db.order_payments.clear(),
     db.outbox.clear(),
     db.meta.clear(),
   ]);

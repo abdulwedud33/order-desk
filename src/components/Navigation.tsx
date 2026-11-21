@@ -23,8 +23,8 @@ export function BottomNav() {
     pathname?.startsWith('/onboarding') ||
     pathname?.startsWith('/auth') ||
     pathname?.startsWith('/join') ||
-    pathname === '/orders/new' ||
-    pathname === '/new'
+    pathname?.startsWith('/orders/new') ||
+    pathname?.startsWith('/new')
   ) {
     return null;
   }

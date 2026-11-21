@@ -11,7 +11,8 @@ export type OutboxKind =
   | 'assign_order'
   | 'cancel_order'
   | 'create_customer'
-  | 'catalog_item';
+  | 'catalog_item'
+  | 'set_settle_later';
 
 export type OutboxStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 

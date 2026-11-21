@@ -109,6 +109,29 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** When advancing an order fails due to an outdated expected status (`ORDER_CONFLICT_FROM`), the sync layer catches the error, updates local Dexie cache with the server's state, and presents a non-alarmist calm toast (`"Order has already been updated to <status>"`) without blocking further user actions.
    - **Reason:** Satisfies Non-negotiable Rule 7 and `docs/03-app-flow.md`: calm conflict handling informs staff without raw error banners or loss of unsaved local work.
 
+## Milestone M5 Decisions (2026-11-21)
+
+1. **DEC-024: Append-Only Payments Ledger & Strict Mutability Lockdown**
+   - **Decision:** All payments, deposits, and refunds are recorded in `public.order_payments` with trigger `check_ledger_immutable()` blocking direct `UPDATE` and `DELETE` operations.
+   - **Reason:** Enforces Non-negotiable Rule 3 and `docs/05-backend-schema.md` s1.4: financial records must form an append-only ledger so daily cash reconciles to the exact birr.
+
+2. **DEC-025: Trigger-Enforced `paid_amount` Single-Writer Invariant (`order_money_guard`)**
+   - **Decision:** Created database trigger `order_money_guard` on `public.order_money` that raises `FORBIDDEN` if `paid_amount` is modified unless the session configuration `order_desk.allow_paid_amount_change` is `'on'`. This flag is set strictly by `order_payments_apply` upon insertion into `order_payments`.
+   - **Reason:** Eliminates race conditions and guarantees that `order_money.paid_amount` is always the exact mathematical derivative of the ledger: $\sum(\text{payments} + \text{deposits}) - \sum(\text{refunds})$.
+
+3. **DEC-026: Role Boundaries on Payments & Owner-Exclusive Refunds**
+   - **Decision:** In `record_payment`, refunds are strictly restricted to shop `owner` and require a non-empty explanation note, capped at `paid_amount`. Courier role is restricted strictly to `payment` kind with `cash` method on assigned delivery orders.
+   - **Reason:** Satisfies FR-P1, `docs/03-app-flow.md` s4, and `docs/security.md`: couriers only report cash collected, and staff cannot issue unauthorized refunds.
+
+4. **DEC-027: Settle-Later Completion Gate & UI Interception**
+   - **Decision:** When advancing an order to `completed`, if `total - paid_amount > 0` and `settle_later = false`, `advance_order` raises `VALIDATION`. In the UI, attempting to complete an unpaid order intercepts the click, presents a clear prompt, and opens the `PaymentSheet` offering one-tap balance settlement or settle-later toggle.
+   - **Reason:** Enforces `docs/05-backend-schema.md` rule 7: completed orders must have a zero balance unless explicitly designated for later settlement.
+
+5. **DEC-028: Persistent Payment Method Preference & Balance Prefill**
+   - **Decision:** The `PaymentSheet` automatically prefills the amount with the exact outstanding balance, and preselects the user's last chosen payment method persisted in `localStorage`.
+   - **Reason:** UX requirement in `docs/03-app-flow.md` s3.5b and `docs/04-ui-ux-design-brief.md` s8: minimizes cognitive load and counter delay (Hick's Law).
+
+
 
 
 

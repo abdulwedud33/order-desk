@@ -127,6 +127,26 @@ export async function pullRecentOrders(shopId: string): Promise<void> {
     };
     await db.orders.put(localOrd);
   }
+
+  // Also pull order_money rows for these orders
+  const { data: monies } = await supabase
+    .from('order_money')
+    .select('order_id, shop_id, subtotal, delivery_fee, total, paid_amount')
+    .eq('shop_id', shopId)
+    .limit(PAGE_SIZE);
+
+  if (monies) {
+    for (const m of monies) {
+      await db.order_money.put({
+        order_id: m.order_id,
+        shop_id: m.shop_id,
+        subtotal: Number(m.subtotal),
+        delivery_fee: Number(m.delivery_fee),
+        total: Number(m.total),
+        paid_amount: Number(m.paid_amount),
+      });
+    }
+  }
 }
 
 // ----------------- Offline Outbox Operations -----------------
@@ -304,6 +324,94 @@ export async function queueAdvanceOrder(
     await db.orders.update(orderId, {
       status: toStatus,
       sync_status: 'pending',
+      updated_at: new Date().toISOString(),
+    });
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+export async function queueRecordPayment(
+  shopId: string,
+  orderId: string,
+  kind: 'payment' | 'deposit' | 'refund',
+  amount: number,
+  method: 'cash' | 'mobile_money' | 'bank' | 'other',
+  note?: string
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'record_payment',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_client_id: clientId,
+      p_kind: kind,
+      p_amount: amount,
+      p_method: method,
+      p_note: note ?? null,
+    },
+  });
+
+  await db.transaction('rw', [db.order_money, db.order_payments, db.outbox], async () => {
+    // 1. Optimistic update to order_money
+    const current = await db.order_money.get(orderId);
+    if (current) {
+      const delta = kind === 'refund' ? -amount : amount;
+      const newPaid = Math.max(0, current.paid_amount + delta);
+      await db.order_money.update(orderId, {
+        paid_amount: newPaid,
+      });
+    }
+
+    // 2. Local payment record
+    await db.order_payments.put({
+      id: clientId,
+      order_id: orderId,
+      shop_id: shopId,
+      kind,
+      amount,
+      method,
+      note: note ?? null,
+      client_id: clientId,
+      created_at: new Date().toISOString(),
+    });
+
+    // 3. Queue in outbox
+    await db.outbox.put(outboxItem);
+  });
+
+  kickSync(shopId);
+}
+
+export async function queueSetSettleLater(
+  shopId: string,
+  orderId: string,
+  settleLater: boolean
+): Promise<void> {
+  if (!db) return;
+
+  const clientId = crypto.randomUUID();
+  const outboxItem = newOutboxItem({
+    id: clientId,
+    shopId,
+    kind: 'set_settle_later',
+    payload: {
+      p_shop: shopId,
+      p_order: orderId,
+      p_settle_later: settleLater,
+      p_client_id: clientId,
+    },
+  });
+
+  await db.transaction('rw', [db.orders, db.outbox], async () => {
+    await db.orders.update(orderId, {
+      settle_later: settleLater,
       updated_at: new Date().toISOString(),
     });
     await db.outbox.put(outboxItem);
@@ -507,6 +615,40 @@ async function sendItem(item: OutboxItem): Promise<OutboxSendResult> {
           accepted_at: data.accepted_at,
           ready_at: data.ready_at,
           completed_at: data.completed_at,
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'record_payment') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('record_payment', payload);
+
+      if (error) {
+        return { ok: false, code: mapError(error) };
+      }
+
+      if (data && db) {
+        await db.order_money.update(payload.p_order as string, {
+          paid_amount: Number(data.paid_amount),
+        });
+      }
+      return { ok: true };
+    }
+
+    if (item.kind === 'set_settle_later') {
+      const payload = item.payload as Record<string, unknown>;
+      const { data, error } = await supabase.rpc('set_settle_later', payload);
+
+      if (error) {
+        return { ok: false, code: mapError(error) };
+      }
+
+      if (data && db) {
+        await db.orders.update(data.id, {
+          settle_later: data.settle_later,
+          version: data.version,
+          updated_at: data.updated_at,
         });
       }
       return { ok: true };

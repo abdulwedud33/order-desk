@@ -7,6 +7,7 @@ import { useApp } from '../../lib/session';
 import { db, type LocalOrder, type LocalOrderItem, type LocalOrderMoney } from '../../lib/db';
 import { pullRecentOrders } from '../../lib/sync';
 import { SkeletonCard } from '../../components/Skeleton';
+import { BalanceChip } from '../../components/BalanceChip';
 import type { MessageKey } from '../../i18n/en';
 
 interface OrderWithDetails extends LocalOrder {
@@ -156,9 +157,16 @@ export default function OrdersPage() {
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-line/40 text-slate">
                   <span>{new Date(ord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   {ord.money && (
-                    <span className="font-heading font-semibold text-ink num text-sm">
-                      {ord.money.total.toFixed(2)} ETB
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <BalanceChip
+                        total={ord.money.total}
+                        paidAmount={ord.money.paid_amount}
+                        settleLater={ord.settle_later}
+                      />
+                      <span className="font-heading font-semibold text-ink num text-sm">
+                        {ord.money.total.toFixed(2)} ETB
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
