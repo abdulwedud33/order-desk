@@ -47,6 +47,7 @@ test.describe('Milestone M9 Reports & Dashboard Flows', () => {
     const createBtn = page.locator('footer button');
     await expect(createBtn).toBeEnabled();
     await createBtn.click();
+    await page.waitForURL(/\/orders/);
 
     // 2. Visit reports page
     await page.goto('/reports');

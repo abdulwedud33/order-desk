@@ -15,6 +15,7 @@ import {
 import { searchCustomers } from '../../../domain/search';
 import { SkeletonRow } from '../../../components/Skeleton';
 import { generatePickupCode } from '../../../domain/repair';
+import { QuickEntrySheet } from '../../../components/QuickEntrySheet';
 import type { OrderType, OrderChannel } from '../../../domain/status';
 import type { MessageKey } from '../../../i18n/en';
 
@@ -53,6 +54,7 @@ export default function NewOrderPage() {
   const [duplicateOrder, setDuplicateOrder] = useState<ExistingOrderSnapshot | null>(null);
   const [ignoreDuplicate, setIgnoreDuplicate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
 
   // Load catalog items & customers from local Dexie
   const loadLocalData = useCallback(async () => {
@@ -254,6 +256,23 @@ export default function NewOrderPage() {
       </header>
 
       <div className="p-4 space-y-4">
+        {/* Quick Entry Shortcut Banner */}
+        <div className="bg-ember-soft border border-ember/30 rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-ink flex items-center gap-1">
+              <span>✨</span> {t('ai.quickEntryTitle')}
+            </p>
+            <p className="text-[11px] text-slate">{t('ai.quickEntryDesc')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsQuickEntryOpen(true)}
+            className="px-3 py-1.5 bg-ember text-on-ember font-semibold text-xs rounded-lg hover:bg-ember-rich transition-transform active:scale-95 shadow-xs whitespace-nowrap"
+          >
+            {t('ai.quickEntry')}
+          </button>
+        </div>
+
         {/* Order Type Tabs */}
         <div>
           <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wider">
@@ -620,6 +639,13 @@ export default function NewOrderPage() {
           {submitting ? t('orders.syncing') : t('orders.newOrder')}
         </button>
       </footer>
+
+      {/* Quick Entry Sheet */}
+      <QuickEntrySheet
+        isOpen={isQuickEntryOpen}
+        onClose={() => setIsQuickEntryOpen(false)}
+        onOrderCreated={() => router.push('/orders')}
+      />
     </main>
   );
 }

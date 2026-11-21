@@ -10,6 +10,7 @@ import { subscribeToOrders } from '../lib/sync';
 import { isAlertMuted, setAlertMuted, playNewOrderAlert } from '../lib/alerts';
 import { OrderTicket } from '../components/OrderTicket';
 import { SkeletonTicket } from '../components/Skeleton';
+import { QuickEntrySheet } from '../components/QuickEntrySheet';
 
 export default function BoardPage() {
   const { t, shop, online, role } = useApp();
@@ -26,6 +27,7 @@ export default function BoardPage() {
   // Phone tab selection: 'new' | 'in_progress' | 'ready' | 'all'
   const [activeTab, setActiveTab] = useState<'new' | 'in_progress' | 'ready' | 'all'>('new');
   const [muted, setMuted] = useState(false);
+  const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
 
   useEffect(() => {
     setMuted(isAlertMuted());
@@ -117,6 +119,18 @@ export default function BoardPage() {
           </button>
 
           {/* New Order Button */}
+          {(role === 'owner' || role === 'staff') && (
+            <button
+              type="button"
+              onClick={() => setIsQuickEntryOpen(true)}
+              className="h-9 px-3 bg-ember-soft text-ember border border-ember/30 font-medium text-xs rounded-control flex items-center justify-center gap-1 transition-transform active:scale-95 shadow-xs"
+              aria-label={t('ai.quickEntry')}
+            >
+              <span>✨</span>
+              <span>{t('ai.quickEntry')}</span>
+            </button>
+          )}
+
           <Link
             href="/orders/new"
             className="h-9 px-3.5 bg-ember text-on-ember font-medium text-xs rounded-control flex items-center justify-center transition-transform active:scale-95 shadow-sm"
@@ -270,6 +284,12 @@ export default function BoardPage() {
           </>
         )}
       </div>
+
+      {/* Quick Entry Sheet (M10) */}
+      <QuickEntrySheet
+        isOpen={isQuickEntryOpen}
+        onClose={() => setIsQuickEntryOpen(false)}
+      />
     </main>
   );
 }

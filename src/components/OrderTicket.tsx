@@ -15,6 +15,7 @@ import { HandoverDialog } from './HandoverDialog';
 import { EstimateApprovalDialog } from './EstimateApprovalDialog';
 import { WaitingReasonDialog } from './WaitingReasonDialog';
 import { AssignCourierDialog } from './AssignCourierDialog';
+import { WriteUpdateDialog } from './WriteUpdateDialog';
 import {
   calculateTurnaroundHours,
   formatTurnaroundHours,
@@ -36,6 +37,7 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
   const [isEstimateOpen, setIsEstimateOpen] = useState(false);
   const [isWaitingReasonOpen, setIsWaitingReasonOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isWriteUpdateOpen, setIsWriteUpdateOpen] = useState(false);
   const [isSettleLater, setIsSettleLater] = useState(order.settle_later ?? false);
 
   const repairJob = useLiveQuery(
@@ -384,6 +386,17 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
               {!isKitchen && (
                 <button
                   type="button"
+                  onClick={() => setIsWriteUpdateOpen(true)}
+                  className="h-11 px-3 rounded-control border border-line bg-surface text-xs font-semibold text-ink hover:bg-paper active:scale-95 transition-transform"
+                  title={t('ai.writeUpdate')}
+                >
+                  💬 {t('ai.writeUpdate')}
+                </button>
+              )}
+
+              {!isKitchen && (
+                <button
+                  type="button"
                   onClick={handleShareTracking}
                   className="h-11 px-3 rounded-control border border-line bg-surface text-xs font-semibold text-ink hover:bg-paper active:scale-95 transition-transform"
                   title={t('tracking.shareLink')}
@@ -478,6 +491,12 @@ export function OrderTicket({ order, items, money, isKitchen = false }: OrderTic
             order={order}
             isOpen={isAssignOpen}
             onClose={() => setIsAssignOpen(false)}
+          />
+
+          <WriteUpdateDialog
+            order={order}
+            isOpen={isWriteUpdateOpen}
+            onClose={() => setIsWriteUpdateOpen(false)}
           />
         </>
       )}

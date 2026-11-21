@@ -9,6 +9,7 @@ import {
 } from '../../domain/reports';
 import { formatOrdersToCsv } from '../../domain/csv';
 import { fetchFullReport, fetchOrdersExport } from '../../lib/reportsApi';
+import { getAiInsights } from '../../lib/aiApi';
 import { BottomNav } from '../../components/Navigation';
 import type { MessageKey } from '../../i18n/en';
 
@@ -19,6 +20,8 @@ export default function ReportsPage() {
   const [isCached, setIsCached] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const formatMoney = useCallback(
     (amount: number) => {
@@ -57,16 +60,27 @@ export default function ReportsPage() {
     loadReport();
   }, [loadReport]);
 
+  const handleGenerateInsights = async () => {
+    if (!shop) return;
+    setLoadingInsights(true);
+    try {
+      const res = await getAiInsights({
+        period,
+        shopId: shop.id,
+      });
+      setInsights(res.insights);
+    } catch {
+      showToast('Failed to generate insights');
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   const handleExportCsv = async () => {
     if (!shop) return;
     setExporting(true);
     try {
       const records = await fetchOrdersExport(shop.id, range.from, range.to);
-      if (records.length === 0) {
-        showToast(t('rep.noOrders'));
-        setExporting(false);
-        return;
-      }
       const csvString = formatOrdersToCsv(records);
       const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -238,6 +252,40 @@ export default function ReportsPage() {
                 </p>
               </div>
             </div>
+
+            {/* Assistant Insights (M10) */}
+            <section className="p-4 bg-surface border border-line rounded-card shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-bold text-slate uppercase tracking-wider flex items-center gap-1.5">
+                  <span>✨</span> {t('ai.insightsTitle')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleGenerateInsights}
+                  disabled={loadingInsights}
+                  className="px-2.5 py-1 text-xs bg-ember text-on-ember font-semibold rounded-lg hover:bg-ember-rich disabled:opacity-50 transition-colors"
+                >
+                  {loadingInsights ? t('ai.analyzing') : t('ai.generateInsights')}
+                </button>
+              </div>
+
+              {insights.length > 0 ? (
+                <div className="space-y-2">
+                  <ul className="space-y-1.5 text-xs text-ink list-disc list-inside">
+                    {insights.map((insight, idx) => (
+                      <li key={idx} className="leading-relaxed">
+                        {insight}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-slate border-t border-line/60 pt-2 flex items-center gap-1">
+                    <span>🔒</span> {t('ai.groundedNotice')}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate">{t('ai.noInsights')}</p>
+              )}
+            </section>
 
             {summary.orders_count === 0 && (
               <div className="text-center py-8 px-4 bg-surface border border-line rounded-card space-y-1 shadow-sm">

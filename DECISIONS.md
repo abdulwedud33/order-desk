@@ -207,6 +207,32 @@ This document records deliberate deviations from planning documents or specific 
    - **Decision:** When reports are retrieved online, the full report snapshot is persisted to Dexie's `db.meta` store under key `report_cache_${shopId}_${period}`. When the device is offline or the backend RPC fails, the application falls back immediately to the cached snapshot with an amber banner: "You're offline. Showing last cached report numbers." If no cache exists, report aggregates are computed locally from cached Dexie orders and payments.
    - **Reason:** Conforms to local-first architecture (`docs/03-app-flow.md` section 5 table row 5) ensuring owners can inspect business metrics even without an internet connection.
 
+## Milestone M10 Decisions (2026-11-21)
+
+1. **DEC-046: Code-Level Phone Redaction and Re-Injection**
+   - **Decision:** Contact and phone numbers (including Ethiopian prefixes `09...`, `07...`, `+2519...`, `+2517...`) are extracted and replaced with `[PHONE_1]`, `[PHONE_2]` placeholders by deterministic code in `src/domain/aiGuardrails.ts` prior to any model invocation, logging, or prompt generation. The real customer phone number is restored exclusively by deterministic application code into `customer_phone` when building the draft.
+   - **Reason:** Satisfies Non-negotiable Rule 1 & Rule 5 (`docs/guardrails.md` s1, `docs/tools.md` s2, `docs/evals.md` s2.26). Zero raw phone numbers ever reach model context, external providers, or token logs.
+
+2. **DEC-047: Server-Enforced Recompute via `propose_order` (Zero Model Prices)**
+   - **Decision:** Model outputs are treated strictly as untrusted draft suggestions. In Edge Function `ai-parse-order`, line item names and IDs are passed to database RPC `public.propose_order`, which prices every item strictly from `public.catalog_items` in PostgreSQL. Any prices supplied by the model or client are completely ignored and stripped.
+   - **Reason:** Non-negotiable Rule 3 and `docs/tools.md` section 2: "the database decides". Prevents prompt injection attacks that attempt to zero out prices or manipulate monetary totals.
+
+3. **DEC-048: Drafts Only Architecture (Confirmed, Not Silent)**
+   - **Decision:** The assistant produces reviewable drafts only (`QuickEntrySheet` with Confirm/Discard, `WriteUpdateDialog` with copy/share). The assistant has zero direct database write permissions and no external messaging tool. Orders are saved only when a human taps "Confirm", and messages are sent only via staff clipboard or device share.
+   - **Reason:** Core AI principle in `docs/guardrails.md` section 2 and `docs/memory.md` section 1: "Confirmed, not silent". The assistant never executes writes or dispatches communications autonomously.
+
+4. **DEC-049: Shop Memory Content Guards and 200-Item Cap**
+   - **Decision:** The `shop_memory` table enforces owner-only RLS, a database trigger capping items at 200 per shop, and a database constraint + trigger blocking phone numbers, URLs, and prompt injection patterns ("ignore previous instructions", "override rules"). The assistant UI presents a dedicated `/memory` screen where the owner can review, delete individual items, or clear all memory.
+   - **Reason:** Enforces `docs/memory.md` sections 1-4: memory belongs to the shop, not the model; it is Visible, Controllable, Confirmed, and strictly Data (not instructions).
+
+5. **DEC-050: Strict Numerical Grounding for Owner Insights**
+   - **Decision:** In `ai-insights`, numbers extracted from generated insight text via `numbersIn` are verified against the set of numbers returned by verified reporting RPCs (`collectNumbers`). If any ungrounded number is detected (excluding small integers 0-10 used for counting), the text is rejected and replaced by deterministic report statistics.
+   - **Reason:** Satisfies `docs/evals.md` section 4: 100% numerical grounding required. Halts hallucinated sales figures, fake percentages, or imaginary profit claims.
+
+6. **DEC-051: Multi-Language Eval Harness & Model Key Gate**
+   - **Decision:** Implemented `tests/ai/eval_harness.ts` with structured test fixtures across English, Amharic, and Afaan Oromo per `docs/evals.md` covering plain orders, quantities in words and digits, memory nicknames, delivery with phone extraction, and adversarial injections. Per instructions, if no live model API key is set in the environment, the harness halts cleanly with status `STOPPED_AT_HARNESS` and informative diagnostic output.
+   - **Reason:** Gates releases across all three languages without regression while respecting user execution environments without active third-party model keys.
+
 
 
 
