@@ -130,10 +130,10 @@ select public.record_payment(
 );
 
 -- Advance to completed
-select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'new'::public.order_status, 'accepted'::public.order_status);
-select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'accepted'::public.order_status, 'in_progress'::public.order_status);
-select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'in_progress'::public.order_status, 'ready'::public.order_status);
-select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'ready'::public.order_status, 'completed'::public.order_status);
+select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'accepted'::public.order_status, 'new'::public.order_status);
+select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'in_progress'::public.order_status, 'accepted'::public.order_status);
+select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'ready'::public.order_status, 'in_progress'::public.order_status);
+select public.advance_order(:'shop_id'::uuid, :'order_completed'::uuid, 'completed'::public.order_status, 'ready'::public.order_status);
 
 -- Order 2: Active takeaway order (Total: 200 ETB, deposit 50 ETB, unpaid balance: 150 ETB)
 select public.create_order(

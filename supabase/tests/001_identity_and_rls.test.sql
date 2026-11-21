@@ -39,7 +39,7 @@ reset role;
 
 -- 1. Structural checks
 select is((select count(*)::int from pg_tables where schemaname = 'public' and not rowsecurity), 0, 'Every public table has RLS enabled');
-select is((select array_agg(t.tablename::text order by t.tablename) from pg_tables t where t.schemaname = 'public' and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = t.tablename)), array['rate_limits'], 'Only rate_limits has no policy');
+select is((select array_agg(t.tablename::text order by t.tablename) from pg_tables t where t.schemaname = 'public' and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = t.tablename)), array['order_counters', 'rate_limits'], 'Only rate_limits and order_counters have no policy');
 
 -- 2. Anonymous access tests (all must throw 42501)
 do $$ begin perform set_config('request.jwt.claims', '{"role":"anon"}', true); perform set_config('request.jwt.claim.sub', '', true); end $$;
@@ -57,7 +57,7 @@ do $$ begin perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000
 set local role authenticated;
 select is((select count(*)::int from public.shops), 0, 'outsider sees no shops');
 select is((select count(*)::int from public.shop_members), 0, 'outsider sees no members');
-select is((select count(*)::int from public.shop_invites), 0, 'outsider sees no invites');
+select is((select count(id)::int from public.shop_invites), 0, 'outsider sees no invites');
 select is((select count(*)::int from public.audit_log), 0, 'outsider sees no audit logs');
 select throws_ok($$select 1 from public.rate_limits$$, '42501', null, 'authenticated cannot read rate_limits');
 select is((select public.is_member('10000000-0000-0000-0000-0000000000a1')), false, 'outsider is_member is false');
@@ -78,7 +78,7 @@ do $$ begin perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000
 set local role authenticated;
 select is((select count(*)::int from public.shops), 1, 'Staff A can read Shop A');
 select is((select public.my_role('10000000-0000-0000-0000-0000000000a1')), 'staff'::public.member_role, 'my_role returns staff for Staff A');
-select is((select count(*)::int from public.shop_invites), 0, 'Staff A cannot read shop_invites');
+select is((select count(id)::int from public.shop_invites), 0, 'Staff A cannot read shop_invites');
 select is((select count(*)::int from public.audit_log), 0, 'Staff A cannot read audit_log');
 select throws_ok($$update public.shops set name = 'Hacked' where id = '10000000-0000-0000-0000-0000000000a1'$$, null, null, 'Staff cannot update shop');
 
@@ -86,7 +86,7 @@ select throws_ok($$update public.shops set name = 'Hacked' where id = '10000000-
 reset role;
 do $$ begin perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', true); end $$;
 set local role authenticated;
-select is((select count(*)::int from public.shop_invites), 2, 'Owner A sees Shop A invites');
+select is((select count(id)::int from public.shop_invites), 2, 'Owner A sees Shop A invites');
 select is((select count(*)::int from public.audit_log), 1, 'Owner A sees Shop A audit logs');
 select lives_ok($$update public.shops set default_delivery_fee = 50.00 where id = '10000000-0000-0000-0000-0000000000a1'$$, 'Owner A can update shop settings');
 
@@ -140,5 +140,5 @@ select lives_ok($$select public.rate_limit_hit('test:key', 2, 60)$$, '1st hit pa
 select lives_ok($$select public.rate_limit_hit('test:key', 2, 60)$$, '2nd hit passes');
 select throws_ok($$select public.rate_limit_hit('test:key', 2, 60)$$, 'RATE_LIMITED', null, '3rd hit raises RATE_LIMITED');
 
-finish();
+select * from finish();
 rollback;

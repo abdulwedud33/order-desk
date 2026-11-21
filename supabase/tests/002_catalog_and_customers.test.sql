@@ -101,5 +101,5 @@ select lives_ok($$insert into public.customers (shop_id, name, phone) values ('1
 -- Unique phone per shop constraint
 select throws_ok($$insert into public.customers (shop_id, name, phone) values ('10000000-0000-0000-0000-0000000000a1', 'Duplicate Phone', '0911223344')$$, '23505', null, 'Duplicate customer phone in same shop is rejected');
 
-finish();
+select * from finish();
 rollback;

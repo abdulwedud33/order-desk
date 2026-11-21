@@ -2,7 +2,7 @@
 -- pgTAP tests for Milestone M7: Delivery and Courier View, Assignment, and RLS Isolation
 
 begin;
-select plan(26);
+select plan(27);
 
 -- 1. Helper function checks
 select has_function('assign_order', 'assign_order RPC exists');
@@ -135,6 +135,7 @@ select set_config('request.jwt.claim.sub', :'u_courier1', true);
 select throws_ok(
   $$ select public.assign_order('55555555-5555-4555-8555-555555555555'::uuid, '77777777-7777-4777-8777-777777777773'::uuid, '44444444-4444-4444-8444-444444444444'::uuid, gen_random_uuid()) $$,
   '42501',
+  null,
   'Courier cannot call assign_order (FORBIDDEN)'
 );
 
@@ -180,7 +181,7 @@ select results_eq(
 -- Dave SELECT order_items: sees items for Order 1
 select results_eq(
   $$ select name, qty from public.order_items where shop_id = '55555555-5555-4555-8555-555555555555'::uuid $$,
-  $$ values ('Burger'::text, 1::int) $$,
+  $$ values ('Burger'::text, 1::numeric) $$,
   'Courier Dave can select items for assigned Order 1'
 );
 
@@ -214,6 +215,7 @@ select set_config('request.jwt.claim.sub', :'u_courier1', true);
 select throws_ok(
   $$ select public.advance_order('55555555-5555-4555-8555-555555555555'::uuid, '77777777-7777-4777-8777-777777777772'::uuid, 'out_for_delivery'::public.order_status, 'ready'::public.order_status, gen_random_uuid()) $$,
   '42501',
+  null,
   'Courier cannot advance another courier order (FORBIDDEN)'
 );
 

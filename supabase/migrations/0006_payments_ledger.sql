@@ -46,7 +46,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   if old.paid_amount is distinct from new.paid_amount then
     if current_setting('order_desk.allow_paid_amount_change', true) is distinct from 'on' then
-      raise exception 'FORBIDDEN: paid_amount can only be modified by the payment ledger trigger';
+      raise exception 'FORBIDDEN';
     end if;
   end if;
   return new;
@@ -110,13 +110,13 @@ begin
 
   -- Refunds are strictly owner-only
   if p_kind = 'refund' and v_role <> 'owner' then
-    raise exception 'FORBIDDEN: Refunds can only be recorded by shop owners';
+    raise exception 'FORBIDDEN';
   end if;
 
   -- Courier role can only record cash payments on their assigned delivery orders
   if v_role = 'courier' then
     if p_kind <> 'payment' or p_method <> 'cash' then
-      raise exception 'FORBIDDEN: Couriers can only record cash payments';
+      raise exception 'FORBIDDEN';
     end if;
   end if;
 
@@ -129,11 +129,11 @@ begin
 
   -- 3. Input validation
   if p_amount is null or p_amount <= 0 then
-    raise exception 'VALIDATION: Payment amount must be greater than zero';
+    raise exception 'VALIDATION';
   end if;
 
   if p_kind = 'refund' and v_trimmed_note is null then
-    raise exception 'VALIDATION: Refund requires a note explaining the reason';
+    raise exception 'VALIDATION';
   end if;
 
   -- 4. Idempotency replay check
@@ -147,34 +147,34 @@ begin
   -- 5. Lock order and order_money
   select * into v_order from public.orders where id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND: Order not found';
+    raise exception 'NOT_FOUND';
   end if;
 
   if v_order.status = 'cancelled' then
-    raise exception 'VALIDATION: Cannot record payment on cancelled order';
+    raise exception 'VALIDATION';
   end if;
 
   -- If courier, verify assigned delivery order
   if v_role = 'courier' then
     if v_order.type <> 'delivery' or v_order.assigned_to is distinct from v_uid then
-      raise exception 'FORBIDDEN: Courier can only record payment on assigned delivery order';
+      raise exception 'FORBIDDEN';
     end if;
   end if;
 
   select * into v_money from public.order_money where order_id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND: Order money record not found';
+    raise exception 'NOT_FOUND';
   end if;
 
   -- 6. Financial validation: Overpayment and Refund caps
   if p_kind in ('payment', 'deposit') then
     v_balance := v_money.total - v_money.paid_amount;
     if p_amount > v_balance then
-      raise exception 'OVERPAYMENT: Payment exceeds outstanding balance';
+      raise exception 'OVERPAYMENT';
     end if;
   elsif p_kind = 'refund' then
     if p_amount > v_money.paid_amount then
-      raise exception 'OVERPAYMENT: Refund exceeds paid amount';
+      raise exception 'OVERPAYMENT';
     end if;
   end if;
 

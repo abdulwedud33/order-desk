@@ -61,11 +61,6 @@ begin
     raise exception 'NOT_FOUND';
   end if;
 
-  -- Concurrency check on status
-  if v_o.status <> p_expected_from then
-    raise exception 'CONFLICT: Order status changed from expected % to %', p_expected_from, v_o.status;
-  end if;
-
   -- Transition check
   if not exists (
     select 1 from public.order_transitions t
@@ -74,29 +69,34 @@ begin
       and t.to_status = p_to
       and v_role = any (t.roles)
   ) then
-    raise exception 'INVALID_TRANSITION: Transition from % to % not allowed for role %', v_o.status, p_to, v_role;
+    raise exception 'INVALID_TRANSITION';
   end if;
 
   -- Role boundary check: courier only on assigned orders
   if v_role = 'courier' and v_o.assigned_to is distinct from v_uid then
-    raise exception 'FORBIDDEN: Couriers can only advance orders assigned to them';
+    raise exception 'FORBIDDEN' using errcode = '42501';
+  end if;
+
+  -- Concurrency check on status
+  if v_o.status <> p_expected_from then
+    raise exception 'CONFLICT';
   end if;
 
   -- Role boundary check: kitchen only accepts/starts/readies/waits
   if v_role = 'kitchen' and p_to not in ('accepted', 'in_progress', 'ready', 'waiting') then
-    raise exception 'FORBIDDEN: Kitchen role cannot advance order to %', p_to;
+    raise exception 'INVALID_TRANSITION';
   end if;
 
   -- Delivery checks
   if v_o.type = 'delivery' and p_to = 'out_for_delivery' and v_o.assigned_to is null then
-    raise exception 'VALIDATION: Delivery order must be assigned to a courier before out_for_delivery';
+    raise exception 'VALIDATION';
   end if;
 
   -- Completed checks: balance zero or settle_later
   if p_to = 'completed' and not v_o.settle_later then
     select coalesce(total - paid_amount, 0) into v_balance from public.order_money where order_id = p_order;
     if v_balance > 0 then
-      raise exception 'VALIDATION: Order has outstanding balance; settle payment or flag settle_later';
+      raise exception 'VALIDATION';
     end if;
   end if;
 
@@ -117,6 +117,19 @@ begin
   values (v_o.id, p_shop, 'status_changed', p_expected_from, p_to, v_uid, p_client_id, jsonb_build_object('by_role', v_role));
 
   return v_o;
+end $$;
+
+-- Overload: 4 arguments (defaults client_id to null)
+create or replace function public.advance_order(
+  p_shop uuid,
+  p_order uuid,
+  p_to public.order_status,
+  p_expected_from public.order_status
+)
+returns public.orders
+language plpgsql security definer set search_path = '' as $$
+begin
+  return public.advance_order(p_shop, p_order, p_to, p_expected_from, null);
 end $$;
 
 -- 3. RPC: assign_order
@@ -157,7 +170,7 @@ begin
   end if;
 
   if v_o.type = 'delivery' and v_target_role <> 'courier' then
-    raise exception 'VALIDATION: Delivery assignee must be a courier';
+    raise exception 'VALIDATION';
   end if;
 
   update public.orders

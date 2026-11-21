@@ -567,7 +567,7 @@ begin
 
   -- 2. Owner override check: ONLY owner can override pickup code
   if coalesce(p_override, false) and v_role <> 'owner' then
-    raise exception 'FORBIDDEN: Only owners may override pickup code verification';
+    raise exception 'FORBIDDEN';
   end if;
 
   -- 3. Rate limit
@@ -586,7 +586,7 @@ begin
   end if;
 
   if v_order.type <> 'repair' then
-    raise exception 'VALIDATION: Handover is only valid for repair orders';
+    raise exception 'VALIDATION';
   end if;
 
   if v_order.status = 'completed' then
@@ -594,24 +594,24 @@ begin
   end if;
 
   if v_order.status <> 'ready' then
-    raise exception 'INVALID_TRANSITION: Order must be in ready status for handover';
+    raise exception 'INVALID_TRANSITION';
   end if;
 
   -- 6. Lock and check repair job
   select * into v_repair from public.repair_jobs where order_id = p_order and shop_id = p_shop for update;
   if not found then
-    raise exception 'NOT_FOUND: Repair job record not found';
+    raise exception 'NOT_FOUND';
   end if;
 
   -- 7. Pickup code verification
   if not coalesce(p_override, false) then
     if p_code is null or btrim(p_code) = '' then
-      raise exception 'INVALID_CODE: Pickup code is required';
+      raise exception 'INVALID_CODE';
     end if;
 
     v_input_hash := sha256(convert_to(upper(btrim(p_code)), 'UTF8'));
     if v_input_hash <> v_repair.pickup_code_hash then
-      raise exception 'INVALID_CODE: Invalid pickup code';
+      raise exception 'INVALID_CODE';
     end if;
   end if;
 
@@ -622,7 +622,7 @@ begin
   where m.order_id = p_order;
 
   if (v_total - v_paid > 0) and not coalesce(v_settle_later, false) then
-    raise exception 'VALIDATION: Order has an unpaid balance. Collect payment or enable Settle Later to complete';
+    raise exception 'VALIDATION';
   end if;
 
   -- 9. Update repair job record

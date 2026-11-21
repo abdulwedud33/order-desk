@@ -78,17 +78,17 @@ declare
 begin
   if tg_op = 'INSERT' then
     if (select count(*) from public.shop_memory where shop_id = new.shop_id) >= 200 then
-      raise exception 'LIMIT_EXCEEDED: Shop memory limit of 200 items reached' using errcode = '22023';
+      raise exception 'LIMIT_EXCEEDED' using errcode = '22023';
     end if;
 
     -- Content safety: memory must never contain raw phone numbers (docs/memory.md section 3)
     if new.value ~ v_phone_pattern or new.key ~ v_phone_pattern then
-      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain phone numbers' using errcode = '23514';
+      raise exception 'FORBIDDEN_CONTENT' using errcode = '23514';
     end if;
 
     -- Content safety: reject instruction-like phrases
     if new.value ~ v_injection_pattern or new.key ~ v_injection_pattern then
-      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain system instructions' using errcode = '23514';
+      raise exception 'FORBIDDEN_CONTENT' using errcode = '23514';
     end if;
 
     new.created_by := (select auth.uid());
@@ -96,7 +96,7 @@ begin
     return new;
   elsif tg_op = 'UPDATE' then
     if new.value ~ v_phone_pattern or new.value ~ v_injection_pattern then
-      raise exception 'FORBIDDEN_CONTENT: Memory items must not contain phone numbers or system instructions' using errcode = '23514';
+      raise exception 'FORBIDDEN_CONTENT' using errcode = '23514';
     end if;
     perform public.write_audit(new.shop_id, 'memory_edited', 'shop_memory', new.id, jsonb_build_object('kind', new.kind, 'key', new.key));
     return new;
@@ -294,7 +294,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   return public.propose_order(
     p_shop,
-    coalesce((p_payload->>'type')::public.order_type, 'walk_in'::public.order_type),
+    coalesce((p_payload->>'type')::public.order_type, 'dine_in'::public.order_type),
     coalesce(p_payload->'items', '[]'::jsonb),
     p_payload->>'label',
     coalesce((p_payload->>'channel')::public.order_channel, 'walk_in'::public.order_channel),

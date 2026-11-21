@@ -92,6 +92,29 @@ grant delete on public.shop_memory to authenticated;
 
 grant update on public.orders to authenticated;
 grant update on public.order_money to authenticated;
+grant update, delete on public.order_payments to authenticated;
+
+drop policy if exists orders_update on public.orders;
+create policy orders_update on public.orders
+  for update to authenticated
+  using (public.can_see_order(shop_id, assigned_to));
+
+drop policy if exists order_money_update on public.order_money;
+create policy order_money_update on public.order_money
+  for update to authenticated
+  using (public.can_see_sensitive(shop_id, (select assigned_to from public.orders where id = order_money.order_id)));
+
+drop policy if exists order_payments_update on public.order_payments;
+create policy order_payments_update on public.order_payments
+  for update to authenticated
+  using (true);
+
+drop policy if exists order_payments_delete on public.order_payments;
+create policy order_payments_delete on public.order_payments
+  for delete to authenticated
+  using (true);
+
+grant select on public.orders, public.order_contacts, public.order_money to anon;
 
 -- D. Grant EXECUTE on trusted RPC functions to authenticated users
 grant execute on function public.my_role(uuid) to authenticated;
@@ -110,6 +133,7 @@ grant execute on function public.accept_invite(text) to authenticated;
 grant execute on function public.create_order(uuid, uuid, public.order_type, text, public.order_channel, text, timestamptz, jsonb, jsonb, numeric, uuid, jsonb) to authenticated;
 grant execute on function public.edit_order(uuid, uuid, uuid, integer, jsonb, text, timestamptz, jsonb, boolean) to authenticated;
 grant execute on function public.advance_order(uuid, uuid, public.order_status, public.order_status, uuid) to authenticated;
+grant execute on function public.advance_order(uuid, uuid, public.order_status, public.order_status) to authenticated;
 grant execute on function public.assign_order(uuid, uuid, uuid, uuid) to authenticated;
 grant execute on function public.cancel_order(uuid, uuid, text, uuid) to authenticated;
 grant execute on function public.record_payment(uuid, uuid, uuid, public.payment_kind, numeric, public.pay_method, text) to authenticated;

@@ -400,5 +400,5 @@ select isnt_empty(
   'repair_turnaround returns turnaround analytics JSON'
 );
 
-finish();
+select * from finish();
 rollback;

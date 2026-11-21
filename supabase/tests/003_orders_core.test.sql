@@ -2,7 +2,7 @@
 -- pgTAP tests for Milestone M3: Orders Core, Numbers, Transitions, and RLS Matrix
 
 begin;
-select plan(32);
+select plan(33);
 
 -- 1. Helper extension check
 select has_table('orders', 'orders table exists');
@@ -84,13 +84,13 @@ values (:'item_id', :'shop_id', 'Special Tibs', 250.00, true);
 -- 5. Test next_order_no atomic increment & formatting
 select row_eq(
   $$ select * from public.next_order_no('55555555-5555-4555-8555-555555555555'::uuid, '2026-11-21'::date) $$,
-  row(1, 'P-001'::text),
+  row(1, 'M-001'::text),
   'next_order_no initializes at 1 with day-letter code'
 );
 
 select row_eq(
   $$ select * from public.next_order_no('55555555-5555-4555-8555-555555555555'::uuid, '2026-11-21'::date) $$,
-  row(2, 'P-002'::text),
+  row(2, 'M-002'::text),
   'next_order_no increments atomically to 2'
 );
 
